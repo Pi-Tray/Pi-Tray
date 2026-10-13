@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+@theme {
+    --font-dm-sans: "DM Sans Variable", system-ui, sans-serif;
+}
+
+/* daisyUI reserves scrollbar space while a modal is open, but the app root never scrolls, so it just shows as a gap */
+:root {
+    scrollbar-gutter: auto !important;
+}

@@ -1,0 +1,94 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-focus",
+    "opener:default",
+    "deep-link:default",
+    "fs:default",
+    {
+      "identifier": "fs:write-all",
+      "allow": [
+        {
+          "path": "$DATA/pi-tray/**/*"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:read-all",
+      "allow": [
+        {
+          "path": "$DATA/pi-tray/**/*"
+        }
+      ]
+    },
+    "shell:default",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "npm-install",
+          "cmd": "npm",
+          "args": [
+            "install",
+            {
+              "validator": "\\S+"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "npm-uninstall",
+          "cmd": "npm",
+          "args": [
+            "uninstall",
+            {
+              "validator": "\\S+"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "npm-install-windows",
+          "cmd": "cmd.exe",
+          "args": [
+            "/c",
+            {
+              "validator": "npm install \\S+"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "npm-uninstall-windows",
+          "cmd": "cmd.exe",
+          "args": [
+            "/c",
+            {
+              "validator": "npm uninstall \\S+"
+            }
+          ],
+          "sidecar": false
+        },
+        {
+          "name": "binaries/sidecar",
+          "args": [
+            {
+              "validator": "^(list-plugins|plugin-info)$"
+            },
+            {
+              "validator": "\\S+"
+            }
+          ],
+          "sidecar": true
+        }
+      ]
+    },
+    "os:default"
+  ]
+}

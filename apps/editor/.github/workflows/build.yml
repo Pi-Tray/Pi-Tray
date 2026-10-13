@@ -1,0 +1,118 @@
+name: "Build"
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+# This workflow builds your Tauri app, caches dependencies, and uploads the binaries as artifacts.
+
+jobs:
+  build-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest" # for Arm based macs (M1 and above).
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest" # for Intel based macs.
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+          - platform: "windows-latest" # TODO: set up cross compilation to produce nsis on ubuntu
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      # CACHE NPM DEPENDENCIES
+      - name: Cache npm dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm # The directory where npm stores its cache
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-npm-
+
+      # CACHE APT PACKAGES (Ubuntu only)
+      - name: Cache apt packages
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: awalsh128/cache-apt-pkgs-action@v1.5.1
+        with:
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          version: 1.0
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Those targets are only used on macos runners.
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      # CACHE RUST/CARGO DEPENDENCIES
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install system dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        # Using 'npm ci' is faster and more reliable for CI environments
+        run: npm ci
+
+      - name: Install sidecar dependencies
+        run: |
+          cd sidecar
+          npm ci
+          cd ..
+
+      # This step builds the app.
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        id: tauri-build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
+
+      # Prepare a multi-line list of artifact paths
+      - name: Prepare artifact paths
+        id: prep_paths
+        shell: bash
+        run: |
+          # Begin a multi-line string for the 'paths' output variable
+          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
+
+          # Pipe the JSON into jq to create a clean, newline-separated list of paths
+          # and append it to the output file
+          echo '${{ steps.tauri-build.outputs.artifactPaths }}' | jq -r .[] >> "$GITHUB_OUTPUT"
+
+          # End the multi-line string with the delimiter
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      # This step uploads the build artifacts.
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-tray-editor-${{ matrix.platform }}-${{ matrix.args || 'default' }}-${{ steps.tauri-build.outputs.appVersion }}
+          path: ${{ steps.prep_paths.outputs.paths }}
