@@ -30,6 +30,7 @@ interface DesiredTile {
     row_idx: number;
     col_idx: number;
     plugin: Plugin;
+    plugin_name: string;
     config: PluginConfig;
     key: string;
 }
@@ -222,7 +223,7 @@ const start_tile = (key: string, desired: DesiredTile) => {
     };
 
     try {
-        const result: unknown = plugin_context.run({kind: "tile", key, tile}, () => live.init({
+        const result: unknown = plugin_context.run({kind: "tile", key, plugin_name: desired.plugin_name, tile}, () => live.init({
             config: desired.config,
             update,
             signal: controller.signal,

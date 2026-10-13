@@ -3,10 +3,26 @@ import {AsyncLocalStorage} from "async_hooks";
 // which plugin a piece of code is running on behalf of. carried through everything a plugin starts
 // (timers, promises, event listeners), so an error thrown from any of them later can be traced back to it
 export type PluginRunContext =
-    | {kind: "tile", key: string, tile: unknown}
+    | {kind: "tile", key: string, plugin_name: string, tile: unknown}
     | {kind: "push", plugin_name: string, x: number, y: number};
 
 export const plugin_context = new AsyncLocalStorage<PluginRunContext>();
+
+/**
+ * A short tag for log lines, saying which plugin and cell the current code is running for.
+ * @returns e.g. "[@pi-tray/builtin/clock live 0,1]", or null outside plugin code
+ */
+export const describe_plugin_context = (): string | null => {
+    const context = plugin_context.getStore();
+
+    if (!context) {
+        return null;
+    }
+
+    return context.kind === "tile"
+        ? `[${context.plugin_name} live ${context.key}]`
+        : `[${context.plugin_name} push ${context.y},${context.x}]`;
+}
 
 type TileErrorHandler = (context: Extract<PluginRunContext, {kind: "tile"}>, error: unknown) => void;
 
@@ -36,13 +52,13 @@ const handle_uncaught = (error: unknown, kind: string) => {
         if (tile_error_handler) {
             tile_error_handler(context, error);
         } else {
-            console.error(`Uncaught ${kind} from live tile ${context.key}:`, error);
+            console.error(`Uncaught ${kind}:`, error);
         }
         return;
     }
 
     // usually from something the push handler started without awaiting, so the push itself may already have been acked
-    console.error(`Uncaught ${kind} from plugin ${context.plugin_name} (pushed at ${context.x},${context.y}):`, error);
+    console.error(`Uncaught ${kind}:`, error);
 }
 
 process.on("uncaughtException", error => handle_uncaught(error, "exception"));
