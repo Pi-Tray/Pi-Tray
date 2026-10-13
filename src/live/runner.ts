@@ -227,7 +227,14 @@ const start_tile = (key: string, desired: DesiredTile) => {
     };
 
     try {
-        const result: unknown = tile_context.run({key, tile}, () => live.init({config: desired.config, update, signal: controller.signal}));
+        const result: unknown = tile_context.run({key, tile}, () => live.init({
+            config: desired.config,
+            update,
+            signal: controller.signal,
+
+            x: desired.col_idx,
+            y: desired.row_idx
+        }));
 
         // init may be async, so a cleanup or a failure can arrive later
         if (result instanceof Promise) {

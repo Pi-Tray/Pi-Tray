@@ -186,6 +186,9 @@ export interface PluginLiveContext<Controls extends PluginLiveControllable> {
      * Aborted when the tile stops, e.g. its cell or config changed or the plugin was reloaded.
      */
     signal: AbortSignal;
+
+    x: number;
+    y: number;
 }
 
 export interface PluginLiveConfig<Controls extends PluginLiveControllable = PluginLiveControllable> {
