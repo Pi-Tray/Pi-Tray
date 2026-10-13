@@ -1,0 +1,137 @@
+name: Build image
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+  # releases made in GitHub's web UI, so their images are built and attached to them
+  release:
+    types:
+      - published
+  # checks for a new Raspberry Pi OS Lite release every monday, and only builds if there is one
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: write
+
+# a release made in the web UI can also fire a tag push, so runs for the same release wait for each other
+# rather than racing to upload the same files
+concurrency:
+  group: build-${{ github.event.release.tag_name || github.ref_name }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    outputs:
+      base_image_url: ${{ steps.resolve.outputs.base_image_url }}
+      should_build: ${{ steps.resolve.outputs.should_build }}
+      should_publish: ${{ steps.resolve.outputs.should_publish }}
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+
+    steps:
+      - name: Resolve the latest base image
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # the "latest" link redirects to a dated file, e.g. .../2025-10-01-raspios-trixie-arm64-lite.img.xz
+          base_image_url=$(curl --fail --silent --show-error --location --head --output /dev/null --write-out '%{url_effective}' https://downloads.raspberrypi.com/raspios_lite_arm64_latest)
+          base_image_name=$(basename "$base_image_url" .img.xz)
+
+          echo "Latest base image: $base_image_name"
+          echo "base_image_url=$base_image_url" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            # one automatic release per base image, so an existing release means it's already been built
+            release_tag="os-$base_image_name"
+
+            if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+              echo "Already built, nothing to do"
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+            fi
+
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "release" ]; then
+            # the release already exists, the build just attaches its files to it
+            release_tag="${{ github.event.release.tag_name }}"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+          else
+            release_tag="${{ github.ref_name }}"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+
+            # manual runs only produce an artifact, tag pushes publish a release
+            if [ "${{ github.ref_type }}" = "tag" ]; then
+              echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    if: needs.check.outputs.should_build == 'true'
+
+    # native arm64, so the image's chroot runs without qemu emulation
+    runs-on: ubuntu-24.04-arm
+
+    steps:
+      - name: Check out this repo
+        uses: actions/checkout@v4
+
+      - name: Check out the client
+        uses: actions/checkout@v4
+        with:
+          repository: Pi-Tray/client
+          path: client
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Build the client
+        working-directory: client
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install image tools
+        run: sudo apt-get update && sudo apt-get install -y parted xz-utils
+
+      # uses the exact image the check saw, in case a new one is released mid-run
+      - name: Build the image
+        run: sudo bash ./build/build-image.sh client/dist out "${{ needs.check.outputs.base_image_url }}"
+
+      - name: Point the Imager list at this release
+        if: needs.check.outputs.should_publish == 'true'
+        run: sudo sed -i "s|PLACEHOLDER_URL|https://github.com/${{ github.repository }}/releases/download/${{ needs.check.outputs.release_tag }}|" out/os_list.json
+
+      - name: Upload as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-tray-image
+          path: out/*
+          # already xz compressed
+          compression-level: 0
+
+      - name: Publish the release
+        if: needs.check.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_tag="${{ needs.check.outputs.release_tag }}"
+
+          # a release made in the web UI already exists, so attach to it, otherwise create one
+          if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            gh release upload "$release_tag" out/* --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$release_tag" out/* --repo "${{ github.repository }}" --title "$release_tag" --generate-notes
+          fi
