@@ -1,10 +1,9 @@
-import {AsyncLocalStorage} from "async_hooks";
-
 import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS} from "../types";
 
 import {add_grid_change_listener, get_loaded_grid} from "../data";
 import {add_plugin_cache_clear_listener, load_plugin} from "../plugins";
 import {clear_live_state, LiveCellState, set_live_state} from "./state";
+import {plugin_context, set_tile_error_handler} from "../plugin_context";
 
 // the fastest a single tile can send updates to clients, faster updates are merged into the next send
 const MIN_UPDATE_INTERVAL_MS = 100;
@@ -44,10 +43,6 @@ const failure_counts = new Map<string, number>();
 
 // tiles only run while someone is watching
 let client_count = 0;
-
-// carried through everything a tile's init starts (timers, promises, event listeners), so an error thrown
-// from any of them later can be traced back to the tile that caused it
-const tile_context = new AsyncLocalStorage<{key: string, tile: RunningTile}>();
 
 // stopped tiles that ignored their signal and keep throwing, each only logged once
 const noisy_stopped_tiles = new WeakSet<RunningTile>();
@@ -227,7 +222,7 @@ const start_tile = (key: string, desired: DesiredTile) => {
     };
 
     try {
-        const result: unknown = tile_context.run({key, tile}, () => live.init({
+        const result: unknown = plugin_context.run({kind: "tile", key, tile}, () => live.init({
             config: desired.config,
             update,
             signal: controller.signal,
@@ -322,29 +317,18 @@ export const live_client_disconnected = () => {
     }
 }
 
-/**
- * Routes an error nothing caught to the live tile that caused it, so one plugin can't take the server down.<br>
- * Errors that didn't come from a live tile are real server bugs, so those still exit as node would by default.
- */
-const handle_uncaught = (error: unknown, kind: string) => {
-    const store = tile_context.getStore();
+// errors from a tile's timers and listeners that nothing caught, routed here by plugin_context
+set_tile_error_handler((context, error) => {
+    const tile = context.tile as RunningTile;
 
-    if (!store) {
-        console.error(`Uncaught ${kind}, exiting:`, error);
-        process.exit(1);
-    }
-
-    if (running_tiles.get(store.key) === store.tile) {
-        handle_tile_failure(store.key, error);
-    } else if (!noisy_stopped_tiles.has(store.tile)) {
+    if (running_tiles.get(context.key) === tile) {
+        handle_tile_failure(context.key, error);
+    } else if (!noisy_stopped_tiles.has(tile)) {
         // a stopped tile whose plugin didn't clear its timers. nothing more can be done without isolating plugins
-        noisy_stopped_tiles.add(store.tile);
-        console.error(`Live tile ${store.key} is still throwing after being stopped, its plugin isn't cleaning up when signal aborts:`, error);
+        noisy_stopped_tiles.add(tile);
+        console.error(`Live tile ${context.key} is still throwing after being stopped, its plugin isn't cleaning up when signal aborts:`, error);
     }
-}
-
-process.on("uncaughtException", error => handle_uncaught(error, "exception"));
-process.on("unhandledRejection", reason => handle_uncaught(reason, "promise rejection"));
+});
 
 // a changed cell may need its tile started, stopped or restarted
 add_grid_change_listener(async () => reconcile_live_tiles());

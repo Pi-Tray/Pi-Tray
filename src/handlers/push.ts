@@ -2,6 +2,7 @@ import type {MessageHandler} from "../types";
 
 import {get_loaded_grid} from "../data";
 import {load_plugin} from "../plugins";
+import {plugin_context} from "../plugin_context";
 
 export default (async (ws, payload) => {
     const grid = get_loaded_grid();
@@ -18,12 +19,17 @@ export default (async (ws, payload) => {
         const plugin_config = typeof cell.plugin === "string" ? undefined : cell.plugin.config;
 
         const plugin = load_plugin(plugin_name);
-        await plugin.handle_push({
-            x: payload.x,
-            y: payload.y,
-            config: plugin_config,
-            ws: ws
-        });
+
+        if (plugin.handle_push) {
+            const handle_push = plugin.handle_push;
+
+            await plugin_context.run({kind: "push", plugin_name, x: payload.x, y: payload.y}, () => handle_push({
+                x: payload.x,
+                y: payload.y,
+                config: plugin_config,
+                ws: ws
+            }));
+        }
     } catch (error) {
         console.error(`Error handling push for plugin ${plugin_name}:`, error);
 
