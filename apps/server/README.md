@@ -9,20 +9,20 @@ this readme needs to be done properly, but this isnt in working order yet so com
 
 once the editor program gets up and running, its going to manage a bit of this for you, especially plugin-env
 
-## Setup (make this better)
+## Setup (make this better and update for monorepo properly)
 
-1. Clone the repository:
+1. Clone the monorepo:
    ```bash
-    git clone https://github.com/Pi-Tray/server.git pi-tray-server
-    cd pi-tray-server
+    git clone https://github.com/Pi-Tray/Pi-Tray.git
+    cd pi-tray
     ```
 2. Install dependencies:
    ```bash
-   npm install
+   pnpm install
    ```
 3. Generate `plugin-env`:
    ```bash
-   npm run plugin:setup
+   pnpm run plugin:setup
    ```
 4. Decide on a port you want the server to run on. By default this is 8080.
 5. Create a connection between the Pi and the computer the server runs on. For me, I connect the Pi directly over Ethernet and assign it a static IP. (I should really do a writeup about this)

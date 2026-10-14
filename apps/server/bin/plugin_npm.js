@@ -22,7 +22,7 @@ const in_plugin_env = (in_path) => {
 const npm_args = process.argv.slice(2);
 if (npm_args.length === 0) {
     console.error("No arguments passed to npm!");
-    console.error("Usage: npm run plugin:npm <npm-command> [args]");
+    console.error("Usage: pnpm plugin:npm <npm-command> [args]");
     return;
 }
 
