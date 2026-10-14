@@ -17,6 +17,7 @@ import {NotFound} from "./pages/NotFound";
 import {onOpenUrl} from "@tauri-apps/plugin-deep-link";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {install_package} from "./util/plugins.ts";
+import {AutostartPrompt} from "./components/AutostartPrompt.tsx";
 
 /**
  * A wrapper component that conditionally renders the WebSocket provider based on the provided URL.<br>
@@ -122,6 +123,7 @@ const App = () => {
 
     return (
         <ConditionalWSProvider url={ws_url}>
+            <AutostartPrompt />
             <div className="font-dm-sans flex h-screen max-h-screen w-screen max-w-screen bg-base-100 select-none overflow-hidden">
                 <LeftNav/>
                 <main className="w-full max-w-full h-full max-h-full">

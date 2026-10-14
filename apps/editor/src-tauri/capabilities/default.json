@@ -77,14 +77,7 @@
         },
         {
           "name": "binaries/pi-tray-service",
-          "args": [
-            {
-              "validator": "^(list-plugins|plugin-info)$"
-            },
-            {
-              "validator": "\\S+"
-            }
-          ],
+          "args": true,
           "sidecar": true
         }
       ]
