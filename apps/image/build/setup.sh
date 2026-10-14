@@ -661,7 +661,7 @@ chmod +x /home/pi-tray/.xinitrc
 cat > /boot/firmware/pi-tray.txt <<'CONF'
 # Address of the Pi-Tray server on your PC. Edit this from any computer by opening the SD card's boot drive.
 # Lines starting with # are ignored.
-ws://192.168.50.1:8080
+ws://192.168.50.1:31415
 CONF
 
 chown -R root:root /opt/pi-tray
