@@ -1,7 +1,7 @@
 import fs from "fs";
 import util from "util";
 
-import {in_data_dir} from "./paths";
+import {in_data_dir} from "@pi-tray/paths";
 import {describe_plugin_context} from "./plugin_context";
 
 // mirrors everything the server prints into a log file per day, so crashes can be debugged after the fact

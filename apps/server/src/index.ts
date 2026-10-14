@@ -4,12 +4,11 @@ import WebSocket from "ws";
 import minimist from "minimist";
 
 import {createServer} from "http";
-import fs from "fs";
 
 import type { MessageData, MessageHandler } from "./types";
 
 // ensure data init scripts run
-import {in_data_dir, write_ws_url_for_editor} from "./data";
+import {write_ws_url_for_editor} from "./data";
 
 import {register_notifiers} from "./notifiers";
 
@@ -50,6 +49,10 @@ ws_server.on("connection", ws => {
 
     connected_clients.add(ws);
 
+    ws.on("error", (error) => {
+        console.warn("Client socket error:", error.message);
+    });
+
     const unregister_notifiers = register_notifiers(ws);
     live_client_connected();
 
@@ -63,7 +66,13 @@ ws_server.on("connection", ws => {
         const decoded = message.toString();
         console.log(`Received message: ${decoded}`);
 
-        const data = JSON.parse(decoded) as MessageData;
+        let data: MessageData;
+        try {
+            data = JSON.parse(decoded);
+        } catch {
+            console.warn("Ignoring a message that isn't valid JSON");
+            return;
+        }
 
         // find the handler for the action
         const handler = handlers[data.action];
@@ -112,11 +121,21 @@ http_server.on("connection", (socket) => {
     }
 });
 
+http_server.on("error", (error: NodeJS.ErrnoException) => {
+    if (error.code === "EADDRINUSE") {
+        console.error(`Port ${port} is already in use, is the server already running? Change "port" in ${SERVER_CONFIG_FILE} if something else uses it.`);
+    } else {
+        console.error("Server error:", error);
+    }
+
+    process.exit(1);
+});
+
 http_server.on("listening", () => {
     console.log(`Server is listening on ws://${host}:${port}`);
 
     let effective_host = host;
-    if (effective_host === "0.0.0.0") {
+    if (effective_host === "0.0.0.0" || effective_host === "::") {
         effective_host = "localhost";
     }
 

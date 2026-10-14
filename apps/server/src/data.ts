@@ -1,9 +1,7 @@
 import fs from "fs";
 
 import type { CellData } from "./types";
-
-import {data_dir, in_data_dir, in_plugin_env, plugin_env} from "./paths";
-export {data_dir, in_data_dir, in_plugin_env, plugin_env};
+import {data_dir, in_data_dir} from "@pi-tray/paths";
 
 fs.mkdirSync(data_dir, {recursive: true});
 

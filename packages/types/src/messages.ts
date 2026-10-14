@@ -32,7 +32,9 @@ export type ServerMessage =
     | {action: "push_ok", payload: CellCoordinates}
     | {action: "push_error", payload: CellCoordinates}
     | {action: "reload", payload?: undefined}
-    | {action: "plugins_reloaded", payload?: undefined};
+    | {action: "plugins_reloaded", payload?: undefined}
+    | {action: "error", payload: {for: unknown}}
+    | {action: "invalid", payload: {for: unknown}};
 
 /**
  * Parses a message from the server, returning null for anything that isn't a well-formed message.<br>

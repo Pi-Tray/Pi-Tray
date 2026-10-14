@@ -3,7 +3,7 @@ import type {IncomingMessage, ServerResponse} from "http";
 import fs from "fs";
 import path from "path";
 
-import {in_data_dir} from "./data";
+import {in_data_dir} from "@pi-tray/paths";
 import {ASSET_CONTENT_TYPES, ASSET_FILE_PATTERN, ASSET_ID_PATTERN, ASSET_PATH_PATTERN, AssetExtension} from "./types";
 
 export const assets_dir = in_data_dir("assets");

@@ -2,7 +2,7 @@ import fs from "fs";
 
 import {default_server_config, parse_server_config, SERVER_CONFIG_FILE, ServerConfig} from "@pi-tray/server-config";
 
-import {data_dir, in_data_dir} from "./paths";
+import {data_dir, in_data_dir} from "@pi-tray/paths";
 
 const config_path = in_data_dir(SERVER_CONFIG_FILE);
 
