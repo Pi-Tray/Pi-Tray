@@ -82,9 +82,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # the editor imports @pi-tray/types, which has to be built first
-      - name: Build shared types
-        run: pnpm --filter @pi-tray/types build
+      # the editor and its sidecar import these, so they have to be built first
+      - name: Build shared packages
+        run: pnpm --filter @pi-tray/types --filter @pi-tray/paths build
 
       # This step builds the app.
       - name: Build Tauri App
