@@ -2,26 +2,29 @@
     "name": "@pi-tray/types",
     "version": "0.0.0",
     "description": "Types shared by Pi-Tray's server, editor, client and plugins",
-    "main": "dist/cjs/index.js",
-    "types": "dist/cjs/index.d.ts",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
     "exports": {
-        ".": {
-            "types": "./dist/cjs/index.d.ts",
-            "import": "./dist/esm/index.js",
-            "require": "./dist/cjs/index.js"
-        }
+        ".": "./src/index.ts"
     },
     "files": [
         "dist"
     ],
     "scripts": {
-        "build": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type: 'module'}))\"",
-        "prepare": "pnpm build",
-        "dev": "pnpm run \"/^watch:/\"",
-        "watch:cjs": "tsc -p tsconfig.json -w --preserveWatchOutput",
-        "watch:esm": "tsc -p tsconfig.esm.json -w --preserveWatchOutput"
+        "build:dist": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type: 'module'}))\""
     },
     "devDependencies": {
         "typescript": "^5.6.0"
+    },
+    "publishConfig": {
+        "main": "./dist/cjs/index.js",
+        "types": "./dist/cjs/index.d.ts",
+        "exports": {
+            ".": {
+                "types": "./dist/cjs/index.d.ts",
+                "import": "./dist/esm/index.js",
+                "require": "./dist/cjs/index.js"
+            }
+        }
     }
 }

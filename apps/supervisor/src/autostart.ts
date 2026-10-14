@@ -17,12 +17,12 @@ const xdg_autostart_path = () => {
 }
 
 /**
- * The command that starts this supervisor: just the executable when installed, node and this script in development.
- * @param server_path passed on as --server, only needed when the server isn't next to the supervisor
+ * The command that starts this supervisor when run on its own: node with the same flags and this script.<br>
+ * pi-tray-service passes its own command instead.
+ * @param server_path passed on as --server
  */
 export const supervisor_launch_command = (server_path?: string): string[] => {
-    const is_packaged = "pkg" in process;
-    const command = is_packaged ? [process.execPath] : [process.execPath, path.resolve(process.argv[1])];
+    const command = [process.execPath, ...process.execArgv, path.resolve(process.argv[1])];
 
     if (server_path) {
         command.push("--server", path.resolve(server_path));

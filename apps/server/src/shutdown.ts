@@ -1,5 +1,5 @@
 import type {Server} from "http";
-import type WebSocket from "ws";
+import type {WebSocketServer} from "ws";
 
 // from sysexits.h, "temporary failure, try again" (used for restart request)
 const EX_TEMPFAIL = 75;
@@ -11,7 +11,7 @@ const GOING_AWAY_CLOSE_CODE = 1001;
 // how long connections get to close before exiting anyway
 const SHUTDOWN_TIMEOUT_MS = 3000;
 
-let registered_servers: {http_server: Server, ws_server: WebSocket.Server} | null = null;
+let registered_servers: {http_server: Server, ws_server: WebSocketServer} | null = null;
 let shutting_down = false;
 
 /**
@@ -56,7 +56,7 @@ export const request_restart = () => {
  * @param http_server the server to stop listening on
  * @param ws_server the websocket server whose clients should be told why they're disconnected
  */
-export const register_for_shutdown = (http_server: Server, ws_server: WebSocket.Server) => {
+export const register_for_shutdown = (http_server: Server, ws_server: WebSocketServer) => {
     registered_servers = {http_server, ws_server};
 
     process.on("SIGINT", () => shutdown_server(0));

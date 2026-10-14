@@ -1,6 +1,6 @@
 import "./logging";
 
-import WebSocket from "ws";
+import {WebSocketServer} from "ws";
 import minimist from "minimist";
 
 import {createServer} from "http";
@@ -42,7 +42,7 @@ console.log(`Starting WebSocket server on ws://${host}:${port}`);
 
 // assets are served over plain http on the same port, so the websocket only has to carry references to them
 const http_server = createServer(handle_asset_request);
-const ws_server = new WebSocket.Server({ server: http_server });
+const ws_server = new WebSocketServer({ server: http_server });
 
 ws_server.on("connection", ws => {
     console.log("Client connected");

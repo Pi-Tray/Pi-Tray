@@ -76,7 +76,7 @@
           "sidecar": false
         },
         {
-          "name": "binaries/sidecar",
+          "name": "binaries/pi-tray-service",
           "args": [
             {
               "validator": "^(list-plugins|plugin-info)$"

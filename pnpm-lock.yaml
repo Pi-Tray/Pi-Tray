@@ -160,25 +160,6 @@ importers:
         specifier: ^6.0.3
         version: 6.4.4(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)
 
-  apps/editor/sidecar:
-    dependencies:
-      '@pi-tray/paths':
-        specifier: workspace:*
-        version: link:../../../packages/paths
-      '@pi-tray/types':
-        specifier: workspace:*
-        version: link:../../../packages/types
-    devDependencies:
-      '@types/node':
-        specifier: ^24.2.1
-        version: 24.19.2
-      '@yao-pkg/pkg':
-        specifier: ^6.6.0
-        version: 6.23.0
-      typescript:
-        specifier: ^5.9.2
-        version: 5.9.3
-
   apps/server:
     dependencies:
       '@pi-tray/paths':
@@ -210,6 +191,28 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
 
+  apps/service:
+    dependencies:
+      '@pi-tray/server':
+        specifier: workspace:*
+        version: link:../server
+      '@pi-tray/supervisor':
+        specifier: workspace:*
+        version: link:../supervisor
+    devDependencies:
+      '@types/node':
+        specifier: ^24.2.1
+        version: 24.19.2
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+      tsx:
+        specifier: ^4.20.3
+        version: 4.23.15
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
   apps/supervisor:
     dependencies:
       '@pi-tray/paths':
@@ -225,6 +228,9 @@ importers:
       '@types/node':
         specifier: ^24.2.1
         version: 24.19.2
+      tsx:
+        specifier: ^4.20.3
+        version: 4.23.15
       typescript:
         specifier: ^5.9.2
         version: 5.9.3

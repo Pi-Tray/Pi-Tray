@@ -1,4 +1,4 @@
-import {ChildProcess, fork, spawn} from "child_process";
+import {ChildProcess, spawn} from "child_process";
 
 import {RESTART_EXIT_CODE, ServerExit, ServerState, SupervisorStatus} from "./constants";
 import {log} from "./log";
@@ -39,10 +39,10 @@ export interface ServerProcess {
 /**
  * Manages the server process, starting and stopping it on request, and restarting it after crashes with backoff.<br>
  * Doesn't start the server until start() is called.
- * @param server_path the server's executable, or a .js file to run with node (for development)
- * @param server_args arguments to pass to the server
+ * @param server_command the server's executable followed by its arguments, e.g. ["node", "server/dist/index.js"]
+ * @param server_env extra environment variables for the server
  */
-export const create_server_process = (server_path: string, server_args: string[]): ServerProcess => {
+export const create_server_process = (server_command: string[], server_env: Record<string, string>): ServerProcess => {
     let child: ChildProcess | null = null;
     let state: ServerState = "stopped";
     let started_at: Date | null = null;
@@ -145,16 +145,15 @@ export const create_server_process = (server_path: string, server_args: string[]
         clear_restart_timer();
 
         const options = {
+            env: {...process.env, ...server_env},
             windowsHide: true,
             // disconnecting the ipc channel is how the server is asked to stop, as windows has no polite stop signal.
             // it also closes if the supervisor dies, so the server never outlives it
             stdio: ["ignore", "inherit", "inherit", "ipc"] as ("ignore" | "inherit" | "ipc")[]
         };
 
-        // a .js server is development, the installed server is its own executable
-        const new_child = server_path.endsWith(".js")
-            ? fork(server_path, server_args, options)
-            : spawn(server_path, server_args, options);
+        const [server_executable, ...server_args] = server_command;
+        const new_child = spawn(server_executable, server_args, options);
 
         child = new_child;
         started_at = new Date();

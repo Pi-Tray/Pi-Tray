@@ -1,0 +1,22 @@
+{
+    "name": "@pi-tray/service",
+    "version": "0.1.0",
+    "private": true,
+    "description": "The server, the supervisor and the editor's plugin helper in one executable, so they share one copy of Node.js",
+    "main": "dist/index.js",
+    "scripts": {
+        "start": "tsx src/index.ts",
+        "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.js --external:bufferutil --external:utf-8-validate",
+        "package": "pnpm build && node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray-service --description \"Pi-Tray\" --icon ../editor/src-tauri/icons/icon.ico --windowed"
+    },
+    "dependencies": {
+        "@pi-tray/server": "workspace:*",
+        "@pi-tray/supervisor": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^24.2.1",
+        "typescript": "^5.9.2",
+        "esbuild": "^0.25.0",
+        "tsx": "^4.20.3"
+    }
+}

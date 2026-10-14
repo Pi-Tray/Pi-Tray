@@ -3,19 +3,13 @@
     "version": "0.1.0",
     "private": true,
     "description": "Keeps the Pi-Tray server running, restarts it on request, and starts it at login",
-    "main": "dist/constants.js",
-    "types": "dist/constants.d.ts",
-    "bin": {
-        "pi-tray-supervisor": "dist/index.js"
+    "main": "./src/constants.ts",
+    "exports": {
+        ".": "./src/constants.ts",
+        "./cli": "./src/cli.ts"
     },
-    "files": [
-        "dist"
-    ],
     "scripts": {
-        "build": "tsc",
-        "prepare": "tsc",
-        "start": "node dist/index.js",
-        "package": "pnpm build && node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray-supervisor --description \"Pi-Tray Supervisor\" --icon ../editor/src-tauri/icons/icon.ico --windowed"
+        "start": "tsx src/index.ts"
     },
     "dependencies": {
         "@pi-tray/paths": "workspace:*",
@@ -24,6 +18,7 @@
     "devDependencies": {
         "@types/minimist": "^1.2.5",
         "@types/node": "^24.2.1",
-        "typescript": "^5.9.2"
+        "typescript": "^5.9.2",
+        "tsx": "^4.20.3"
     }
 }

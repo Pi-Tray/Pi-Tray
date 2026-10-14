@@ -5,7 +5,7 @@
         "build": "pnpm -r build",
         "dev": "pnpm -r --parallel --stream run dev",
         "typecheck": "pnpm -r exec tsc --noEmit",
-        "release:editor": "pnpm --filter @pi-tray/editor tauri build --config src-tauri/tauri.bundle.json"
+        "release:editor": "pnpm --filter @pi-tray/editor tauri build"
     },
     "devDependencies": {
         "@yao-pkg/pkg": "^6.23.0",

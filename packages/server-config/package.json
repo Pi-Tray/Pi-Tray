@@ -3,16 +3,11 @@
     "version": "0.0.0",
     "private": true,
     "description": "",
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
     "files": [
-        "dist"
+        "src"
     ],
-    "scripts": {
-        "build": "tsc",
-        "prepare": "tsc",
-        "dev": "tsc -w --preserveWatchOutput"
-    },
     "devDependencies": {
         "@types/node": "^24.2.1",
         "typescript": "^5.6.0"

@@ -33,11 +33,10 @@ jobs:
             exit 1
           fi
 
+      # packing builds the compiled output (prepack), and publishConfig points the tarball at it instead of the source
       - name: Build and pack
         working-directory: packages/types
-        run: |
-          pnpm build
-          pnpm pack --pack-destination ../../out
+        run: pnpm pack --pack-destination ../../out
 
       - name: Publish the release
         env:

@@ -6,9 +6,9 @@
     "type": "module",
     "scripts": {
         "dev": "tauri dev",
-        "dev:vite": "pnpm --filter @pi-tray/editor-sidecar build && vite",
-        "build": "tsc && vite build && pnpm --filter @pi-tray/editor-sidecar build",
-        "build:bundled-exes": "pnpm --workspace-concurrency=1 --filter @pi-tray/server --filter @pi-tray/supervisor run package --out ../editor/src-tauri/binaries --target-suffix",
+        "build": "tsc && vite build && pnpm run build:service",
+        "build:service": "pnpm --filter @pi-tray/service package --out ../editor/src-tauri/binaries --target-suffix",
+        "dev:vite": "node -e \"process.exit(require('fs').readdirSync('src-tauri/binaries').some((file) => file.startsWith('pi-tray-service-')) ? 0 : 1)\" || pnpm run build:service && vite",
         "preview": "vite preview",
         "tauri": "tauri"
     },

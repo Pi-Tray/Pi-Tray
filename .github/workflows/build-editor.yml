@@ -78,13 +78,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      # one install covers the editor, its sidecar and @pi-tray/types
+      # one install covers the editor, pi-tray-service and the shared packages
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      # the editor and its sidecar import these, so they have to be built first
-      - name: Build shared packages
-        run: pnpm --filter @pi-tray/types --filter @pi-tray/paths build
 
       # This step builds the app.
       - name: Build Tauri App
@@ -96,7 +92,7 @@ jobs:
           projectPath: apps/editor
           # the lockfile is at the repo root, so tauri-action can't detect pnpm by itself
           tauriScript: pnpm tauri
-          args: ${{ matrix.args }} --config src-tauri/tauri.bundle.json
+          args: ${{ matrix.args }}
 
       # Prepare a multi-line list of artifact paths
       - name: Prepare artifact paths

@@ -1,6 +1,5 @@
 packages:
   - "apps/*"
-  - "apps/editor/sidecar"
   - "packages/*"
 
 # esbuild (used by vite and tsx) needs its install script to fetch its binary
