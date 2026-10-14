@@ -8,7 +8,20 @@ packageExtensionsChecksum: sha256-yBpVbMfDWI5BqCmL9mhw2aByZwWF5R0200UZFgbTiZs=
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      '@yao-pkg/pkg':
+        specifier: ^6.23.0
+        version: 6.23.0
+      minimist:
+        specifier: ^1.2.8
+        version: 1.2.8
+      pe-library:
+        specifier: ^1.0.1
+        version: 1.0.1
+      resedit:
+        specifier: ^2.0.3
+        version: 2.0.3
 
   apps/client:
     dependencies:
@@ -193,6 +206,25 @@ importers:
       tsx:
         specifier: ^4.20.3
         version: 4.23.15
+      typescript:
+        specifier: ^5.9.2
+        version: 5.9.3
+
+  apps/supervisor:
+    dependencies:
+      '@pi-tray/paths':
+        specifier: workspace:*
+        version: link:../../packages/paths
+      minimist:
+        specifier: ^1.2.8
+        version: 1.2.8
+    devDependencies:
+      '@types/minimist':
+        specifier: ^1.2.5
+        version: 1.2.5
+      '@types/node':
+        specifier: ^24.2.1
+        version: 24.19.2
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -1989,6 +2021,10 @@ packages:
   path-parse@1.0.7:
     resolution: {integrity: sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw==}
 
+  pe-library@1.0.1:
+    resolution: {integrity: sha512-nh39Mo1eGWmZS7y+mK/dQIqg7S1lp38DpRxkyoHf0ZcUs/HDc+yyTjuOtTvSMZHmfSLuSQaX945u05Y2Q6UWZg==}
+    engines: {node: '>=14', npm: '>=7'}
+
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -2090,6 +2126,10 @@ packages:
   require-directory@2.1.1:
     resolution: {integrity: sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q==}
     engines: {node: '>=0.10.0'}
+
+  resedit@2.0.3:
+    resolution: {integrity: sha512-oTeemxwoMuxxTYxXUwjkrOPfngTQehlv0/HoYFNkB4uzsP1Un1A9nI8JQKGOFkxpqkC7qkMs0lUsGrvUlbLNUA==}
+    engines: {node: '>=14', npm: '>=7'}
 
   resolve-from@4.0.0:
     resolution: {integrity: sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g==}
@@ -4248,6 +4288,8 @@ snapshots:
 
   path-parse@1.0.7: {}
 
+  pe-library@1.0.1: {}
+
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
@@ -4389,6 +4431,10 @@ snapshots:
       unified: 11.0.5
 
   require-directory@2.1.1: {}
+
+  resedit@2.0.3:
+    dependencies:
+      pe-library: 1.0.1
 
   resolve-from@4.0.0: {}
 

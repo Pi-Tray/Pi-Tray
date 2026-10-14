@@ -8,6 +8,7 @@
         "dev": "tauri dev",
         "dev:vite": "pnpm --filter @pi-tray/editor-sidecar build && vite",
         "build": "tsc && vite build && pnpm --filter @pi-tray/editor-sidecar build",
+        "build:bundled-exes": "pnpm --workspace-concurrency=1 --filter @pi-tray/server --filter @pi-tray/supervisor run package --out ../editor/src-tauri/binaries --target-suffix",
         "preview": "vite preview",
         "tauri": "tauri"
     },

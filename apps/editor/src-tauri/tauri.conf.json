@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Pi-Tray Editor",
+  "productName": "Pi-Tray",
   "version": "0.0.0",
   "identifier": "codes.ollieg.pi-tray.editor",
   "build": {

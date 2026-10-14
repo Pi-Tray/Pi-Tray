@@ -96,7 +96,7 @@ jobs:
           projectPath: apps/editor
           # the lockfile is at the repo root, so tauri-action can't detect pnpm by itself
           tauriScript: pnpm tauri
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} --config src-tauri/tauri.bundle.json
 
       # Prepare a multi-line list of artifact paths
       - name: Prepare artifact paths

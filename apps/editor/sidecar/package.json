@@ -6,13 +6,12 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "build-ts": "tsc",
-        "build": "tsc && node bin/package.mjs"
+        "build": "tsc && node ../../../scripts/package-exe.mjs --entry dist/index.js --name sidecar --description \"Pi-Tray Editor Helper\" --icon ../src-tauri/icons/icon.ico --out ../src-tauri/binaries --target-suffix"
     },
     "author": "obfuscatedgenerated",
     "license": "MIT",
     "devDependencies": {
         "@types/node": "^24.2.1",
-        "@yao-pkg/pkg": "^6.6.0",
         "typescript": "^5.9.2"
     },
     "private": true,

@@ -12,7 +12,8 @@
         "plugin:npm": "node bin/plugin_npm.js",
         "where:appdata": "node bin/where_appdata.js",
         "where:pi-tray": "node bin/where_appdata.js pi-tray",
-        "where:plugin-env": "node bin/where_appdata.js pi-tray/plugin-env"
+        "where:plugin-env": "node bin/where_appdata.js pi-tray/plugin-env",
+        "package": "pnpm build && node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray-server --description \"Pi-Tray Server\" --icon ../editor/src-tauri/icons/icon.ico"
     },
     "author": "obfuscatedgenerated",
     "license": "MIT",
