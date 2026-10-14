@@ -1,0 +1,20 @@
+{
+    "name": "@pi-tray/server-config",
+    "version": "0.0.0",
+    "private": true,
+    "description": "",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc",
+        "prepare": "tsc",
+        "dev": "tsc -w --preserveWatchOutput"
+    },
+    "devDependencies": {
+        "@types/node": "^24.2.1",
+        "typescript": "^5.6.0"
+    }
+}

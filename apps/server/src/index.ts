@@ -2,35 +2,41 @@ import "./logging";
 
 import WebSocket from "ws";
 import minimist from "minimist";
+
 import {createServer} from "http";
+import fs from "fs";
 
 import type { MessageData, MessageHandler } from "./types";
 
 // ensure data init scripts run
-import {write_ws_url_for_editor} from "./data";
+import {in_data_dir, write_ws_url_for_editor} from "./data";
 
 import {register_notifiers} from "./notifiers";
 
-import * as _handlers from "./handlers";
 import {connected_clients} from "./clients";
 import {handle_asset_request} from "./assets";
 import {live_client_connected, live_client_disconnected} from "./live/runner";
+import {apply_arg_overrides, SERVER_CONFIG_FILE} from "@pi-tray/server-config";
+import {load_server_config} from "./config";
+
+import * as _handlers from "./handlers";
+import {create_address_filter} from "./network_filter";
 const handlers: { [action: string]: MessageHandler | undefined } = _handlers;
 Object.freeze(handlers);
 
-// TODO: set host and port from data dir
-// TODO: pass custom data directory as argument
+// TODO: pass custom data directory as argument?
 
-const args = minimist(process.argv.slice(2));
-const port = args.port || 8080;
-const host = args.host || "127.0.0.1";
+const config = apply_arg_overrides(load_server_config(), minimist(process.argv.slice(2)));
+const {host, port} = config;
 
-if (host === "127.0.0.1" || host === "localhost") {
-    console.warn("Warning: Using localhost. Server will not be accessible from other devices on network. You should specify a --host= argument to choose an interface to host on.");
+if (host === "127.0.0.1" || host === "::1" || host === "localhost") {
+    console.warn(`Warning: hosting on ${host}, so only this PC can connect. Set "host" in ${SERVER_CONFIG_FILE} to reach the server from your Pi.`);
 }
 
-if (host === "0.0.0.0") {
-    console.warn("Warning: Using 0.0.0.0. Server will be hosted on all interfaces! Be careful with this, as it will allow anyone on the network to connect to your server. Do NOT forward the assigned port.");
+if (config.allowed_networks.length === 0) {
+    console.warn(`Warning: allowed_networks in ${SERVER_CONFIG_FILE} is empty, so every connection will be refused.`);
+} else {
+    console.log(`Accepting connections from: ${config.allowed_networks.join(", ")}`);
 }
 
 console.log(`Starting WebSocket server on ws://${host}:${port}`);
@@ -94,6 +100,16 @@ ws_server.on("connection", ws => {
             motd: "Served fresh!"
         }
     }));
+});
+
+const is_allowed_address = create_address_filter(config.allowed_networks);
+
+// checked on the raw connection, so blocked addresses can't reach the websocket or the asset files
+http_server.on("connection", (socket) => {
+    if (!is_allowed_address(socket.remoteAddress)) {
+        console.warn(`Refused connection from ${socket.remoteAddress}, it isn't in allowed_networks`);
+        socket.destroy();
+    }
 });
 
 http_server.on("listening", () => {

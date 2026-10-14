@@ -171,6 +171,9 @@ importers:
       '@pi-tray/paths':
         specifier: workspace:*
         version: link:../../packages/paths
+      '@pi-tray/server-config':
+        specifier: workspace:*
+        version: link:../../packages/server-config
       '@pi-tray/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -195,6 +198,15 @@ importers:
         version: 5.9.3
 
   packages/paths:
+    devDependencies:
+      '@types/node':
+        specifier: ^24.2.1
+        version: 24.19.2
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
+  packages/server-config:
     devDependencies:
       '@types/node':
         specifier: ^24.2.1

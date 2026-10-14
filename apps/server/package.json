@@ -19,6 +19,7 @@
     "dependencies": {
         "@pi-tray/paths": "workspace:*",
         "@pi-tray/types": "workspace:*",
+        "@pi-tray/server-config": "workspace:*",
         "@types/ws": "^8.18.1",
         "minimist": "^1.2.8",
         "ws": "^8.18.3"
