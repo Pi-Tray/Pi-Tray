@@ -7,15 +7,28 @@ import {in_data_dir} from "./paths";
 
 export const logs_dir = await in_data_dir("logs");
 
-export interface LogSource {
+interface LogSourceBase {
     label: string;
     description: string;
+}
 
+interface LogSourceDated extends LogSourceBase {
     /**
-     * Log files are named <file_prefix>-YYYY-MM-DD.log in the logs folder.
+     * Log files are named <file_prefix>-YYYY-MM-DD.log in the logs folder, one per day.
      */
     file_prefix: string;
 }
+
+interface LogSourceSingular extends LogSourceBase {
+    /**
+     * The log is <file_name>.log in the logs folder, and the one before it <file_name>.old.log once it gets too big.
+     */
+    file_name: string;
+}
+
+export type LogSource = LogSourceDated | LogSourceSingular;
+
+const is_dated_source = (source: LogSource): source is LogSourceDated => "file_prefix" in source;
 
 /**
  * Every log the editor can show, keyed by the name used in the url, e.g. /devtools/logs/server.
@@ -25,8 +38,17 @@ export const LOG_SOURCES: Record<string, LogSource> = {
         label: "Server",
         description: "Everything Pi-Tray Server prints, including crashes and plugin errors.",
         file_prefix: "server"
+    },
+    supervisor: {
+        label: "Supervisor",
+        description: "The Pi-Tray Supervisor's own logs, including its attempts to start the server.",
+        file_name: "supervisor"
     }
 };
+
+// the files of a single-file source: the one being written, and the one before it
+const CURRENT_FILE_KEY = "current";
+const OLD_FILE_KEY = "old";
 
 export interface LogEntry {
     /**
@@ -43,31 +65,65 @@ export interface LogEntry {
     message: string;
 
     /**
-     * The line the server writes each time it starts, shown as a divider.
+     * The line written each time the server or supervisor starts, shown as a divider.
      */
     is_start_banner: boolean;
 }
 
-// keeps the view responsive on long days, the oldest entries are dropped first
+// keeps the view responsive on long logs, the oldest entries are dropped first
 const MAX_ENTRIES = 5000;
 
 // how often to check for new lines, on top of the folder watcher, in case it misses a change
 const POLL_INTERVAL_MS = 2000;
 
-// e.g. 2026-10-03T02:51:41.928Z [ERROR] message
-const ENTRY_START = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z) \[([A-Z]+)\] ?(.*)$/;
+// the server's lines, e.g. 2026-10-03T02:51:41.928Z [ERROR] message
+const SERVER_ENTRY_START = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z) \[([A-Z]+)\] ?(.*)$/;
+
+// the supervisor's lines, which have no level, e.g. [2026-10-03T02:51:41.928Z] message
+const SUPERVISOR_ENTRY_START = /^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\] ?(.*)$/;
+
+const START_BANNERS = ["--- Server starting", "Supervisor started"];
 
 /**
- * The date the server uses for today's log file. It's UTC, as the server names files from toISOString().
+ * The file to show when a source is first opened: today's for a dated source, the current one otherwise.<br>
+ * Today is UTC, as the server names its files from toISOString().
  */
-export const current_log_day = () => new Date().toISOString().slice(0, 10);
-
-export const log_file_path = (source: LogSource, day: string) => join(logs_dir, `${source.file_prefix}-${day}.log`);
+export const default_log_file = (source: LogSource): string => {
+    return is_dated_source(source) ? new Date().toISOString().slice(0, 10) : CURRENT_FILE_KEY;
+}
 
 /**
- * Lists the days a source has logs for, newest first.
+ * How to show a file in the picker: the date for a dated source, "Current" or "Previous" otherwise.
  */
-export const list_log_days = async (source: LogSource): Promise<string[]> => {
+export const log_file_label = (source: LogSource, file_key: string): string => {
+    if (is_dated_source(source)) {
+        return file_key;
+    }
+
+    return file_key === OLD_FILE_KEY ? "Previous" : "Current";
+}
+
+/**
+ * @param source the log
+ * @param file_key a day e.g. 2026-10-03 for a dated source, "current" or "old" otherwise
+ */
+export const log_file_path = (source: LogSource, file_key: string) => {
+    if (is_dated_source(source)) {
+        return join(logs_dir, `${source.file_prefix}-${file_key}.log`);
+    }
+
+    return join(logs_dir, file_key === OLD_FILE_KEY ? `${source.file_name}.old.log` : `${source.file_name}.log`);
+}
+
+/**
+ * Lists the files a source has, newest first: days for a dated source, "current" then "old" (if there is one) otherwise.
+ */
+export const list_log_files = async (source: LogSource): Promise<string[]> => {
+    if (!is_dated_source(source)) {
+        const has_old_file = await exists(await log_file_path(source, OLD_FILE_KEY));
+        return has_old_file ? [CURRENT_FILE_KEY, OLD_FILE_KEY] : [CURRENT_FILE_KEY];
+    }
+
     if (!await exists(logs_dir)) {
         return [];
     }
@@ -82,6 +138,24 @@ export const list_log_days = async (source: LogSource): Promise<string[]> => {
 }
 
 /**
+ * Reads the timestamp, level and message from the first line of an entry, in either log format.
+ * @returns null for a line that continues the entry above it, like a stack trace
+ */
+const parse_entry_start = (line: string): {timestamp: string, level: string, message: string} | null => {
+    const server_match = line.match(SERVER_ENTRY_START);
+    if (server_match) {
+        return {timestamp: server_match[1], level: server_match[2], message: server_match[3]};
+    }
+
+    const supervisor_match = line.match(SUPERVISOR_ENTRY_START);
+    if (supervisor_match) {
+        return {timestamp: supervisor_match[1], level: "INFO", message: supervisor_match[2]};
+    }
+
+    return null;
+}
+
+/**
  * Turns lines into entries. Lines without a timestamp, like stack traces, are added to the entry above them.
  * @returns a new array, the last entry is replaced rather than changed if lines are added to it
  */
@@ -90,15 +164,15 @@ const append_lines = (entries: LogEntry[], lines: string[], next_id: () => numbe
 
     for (const raw_line of lines) {
         const line = raw_line.replace(/\r$/, "");
-        const entry_match = line.match(ENTRY_START);
+        const entry_start = parse_entry_start(line);
 
-        if (entry_match) {
+        if (entry_start) {
             appended_entries.push({
                 id: next_id(),
-                timestamp: new Date(entry_match[1]),
-                level: entry_match[2],
-                message: entry_match[3],
-                is_start_banner: entry_match[3].startsWith("--- Server starting")
+                timestamp: new Date(entry_start.timestamp),
+                level: entry_start.level,
+                message: entry_start.message,
+                is_start_banner: START_BANNERS.some((banner) => entry_start.message.startsWith(banner))
             });
         } else if (appended_entries.length > 0) {
             const last_entry = appended_entries[appended_entries.length - 1];
@@ -122,18 +196,18 @@ export interface LogTail {
 }
 
 /**
- * A React hook that reads a log file and keeps up with it as the server writes more.<br>
- * Only the new part of the file is read each time, so following a long day's log stays cheap.
+ * A React hook that reads a log file and keeps up with it as more is written.<br>
+ * Only the new part of the file is read each time, so following a long log stays cheap.
  * @param source the log to read
- * @param day the day to read, e.g. 2026-10-03
+ * @param file_key which of its files, from {@link list_log_files} or {@link default_log_file}
  */
-export const useLogTail = (source: LogSource | null, day: string | null): LogTail => {
+export const useLogTail = (source: LogSource | null, file_key: string | null): LogTail => {
     const [tail, setTail] = useState<LogTail>({entries: [], loaded: false, file_exists: false, error: null});
 
     useEffect(() => {
         setTail({entries: [], loaded: false, file_exists: false, error: null});
 
-        if (!source || !day) {
+        if (!source || !file_key) {
             return;
         }
 
@@ -161,7 +235,7 @@ export const useLogTail = (source: LogSource | null, day: string | null): LogTai
             reading = true;
 
             try {
-                const path = await log_file_path(source, day);
+                const path = await log_file_path(source, file_key);
 
                 do {
                     read_again = false;
@@ -175,7 +249,7 @@ export const useLogTail = (source: LogSource | null, day: string | null): LogTai
 
                     const file_size = (await stat(path)).size;
 
-                    // smaller than what's been read means the file was replaced, so start again
+                    // smaller than what's been read means the file was replaced (e.g. the supervisor rotated it), so start again
                     if (file_size < offset) {
                         offset = 0;
                         leftover = "";
@@ -241,7 +315,7 @@ export const useLogTail = (source: LogSource | null, day: string | null): LogTai
             clearInterval(poll_timer);
             unwatch_promise.then(unwatch => unwatch?.()).catch(() => {});
         };
-    }, [source, day]);
+    }, [source, file_key]);
 
     return tail;
 }

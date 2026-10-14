@@ -4,7 +4,7 @@ import {Link} from "wouter";
 import {ArrowDown, ArrowLeft, FolderOpen, Search, Siren} from "lucide-react";
 import {revealItemInDir} from "@tauri-apps/plugin-opener";
 
-import {current_log_day, list_log_days, LOG_SOURCES, log_file_path, LogEntry, logs_dir, useLogTail} from "../../util/logs";
+import {default_log_file, list_log_files, LOG_SOURCES, log_file_path, LogEntry, logs_dir, useLogTail} from "../../util/logs";
 
 // the levels the server's logger writes, in the order the filter shows them
 const LOG_LEVELS = ["FATAL", "ERROR", "WARN", "INFO", "LOG", "DEBUG"];
@@ -91,7 +91,7 @@ export const DevToolsLogsPage = ({params}: {params?: {source?: string}}) => {
     const source = LOG_SOURCES[source_name] ?? null;
 
     // following today switches to the new file at midnight, picking a day stays on it
-    const [today, setToday] = useState(current_log_day);
+    const [today, setToday] = useState(default_log_file(source));
     const [chosen_day, setChosenDay] = useState<string | null>(null);
     const day = chosen_day ?? today;
 
@@ -109,13 +109,13 @@ export const DevToolsLogsPage = ({params}: {params?: {source?: string}}) => {
 
     // the date changes at midnight (UTC, like the server's file names)
     useEffect(() => {
-        const day_timer = setInterval(() => setToday(current_log_day()), 30_000);
+        const day_timer = setInterval(() => setToday(default_log_file(source)), 30_000);
         return () => clearInterval(day_timer);
     }, []);
 
     useEffect(() => {
         if (source) {
-            list_log_days(source).then(setAvailableDays).catch(() => setAvailableDays([]));
+            list_log_files(source).then(setAvailableDays).catch(() => setAvailableDays([]));
         }
     }, [source, today, tail.file_exists]);
 
