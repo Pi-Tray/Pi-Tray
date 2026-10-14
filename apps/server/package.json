@@ -6,6 +6,7 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "start": "tsx src/index.ts",
+        "dev": "tsx watch src/index.ts",
         "build": "tsc",
         "plugin:setup": "node bin/plugin_setup.js",
         "plugin:npm": "node bin/plugin_npm.js",
