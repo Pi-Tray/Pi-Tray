@@ -2,3 +2,17 @@ packages:
   - "apps/*"
   - "apps/editor/sidecar"
   - "packages/*"
+
+# esbuild (used by vite and tsx) needs its install script to fetch its binary
+onlyBuiltDependencies:
+  - esbuild
+
+# the editor uses react 18 and the client react 19. wouter imports react's types without listing them,
+# so it would pick whichever @types/react pnpm hoisted. this makes it use the version of the app using it
+packageExtensions:
+  wouter:
+    peerDependencies:
+      "@types/react": "*"
+    peerDependenciesMeta:
+      "@types/react":
+        optional: true

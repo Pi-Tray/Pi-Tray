@@ -1,12 +1,17 @@
-name: "Build"
+name: Build editor
 
 on:
   workflow_dispatch:
   push:
     branches:
       - main
+    paths:
+      - "apps/editor/**"
+      - "packages/types/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/build-editor.yml"
 
-# This workflow builds your Tauri app, caches dependencies, and uploads the binaries as artifacts.
+# This workflow builds the Tauri app, caches dependencies, and uploads the binaries as artifacts.
 
 jobs:
   build-tauri:
@@ -28,19 +33,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # reads the version from the root package.json's packageManager field
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      # caches pnpm's store, keyed on the lockfile
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
-
-      # CACHE NPM DEPENDENCIES
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ~/.npm # The directory where npm stores its cache
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
+          cache: pnpm
 
       # CACHE APT PACKAGES (Ubuntu only)
       - name: Cache apt packages
@@ -65,8 +67,8 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            apps/editor/src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('apps/editor/src-tauri/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
@@ -76,15 +78,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install frontend dependencies
-        # Using 'npm ci' is faster and more reliable for CI environments
-        run: npm ci
+      # one install covers the editor, its sidecar and @pi-tray/types
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Install sidecar dependencies
-        run: |
-          cd sidecar
-          npm ci
-          cd ..
+      # the editor imports @pi-tray/types, which has to be built first
+      - name: Build shared types
+        run: pnpm --filter @pi-tray/types build
 
       # This step builds the app.
       - name: Build Tauri App
@@ -93,6 +93,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          projectPath: apps/editor
+          # the lockfile is at the repo root, so tauri-action can't detect pnpm by itself
+          tauriScript: pnpm tauri
           args: ${{ matrix.args }}
 
       # Prepare a multi-line list of artifact paths
@@ -114,5 +117,4 @@ jobs:
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pi-tray-editor-${{ matrix.platform }}-${{ matrix.args || 'default' }}-${{ steps.tauri-build.outputs.appVersion }}
-          path: ${{ steps.prep_paths.outputs.paths }}
+          name: pi-tray-editor-${{ matrix.platform }}-${{ matrix.args || 'default' }}-${{

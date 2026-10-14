@@ -88,6 +88,7 @@ const find_desired_tiles = (): Map<string, DesiredTile> => {
                 row_idx,
                 col_idx,
                 plugin,
+                plugin_name,
                 config,
                 key: JSON.stringify([plugin_name, config])
             });

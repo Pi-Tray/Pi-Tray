@@ -6,7 +6,7 @@ import {Command} from "@tauri-apps/plugin-shell";
 import {platform} from "@tauri-apps/plugin-os";
 
 // TODO: does pi-tray want to be a monorepo?
-import type {PluginReference, PluginConfigTemplate, PluginLiveControllable} from "pi-tray-server/src/types";
+import type {PluginReference, PluginConfigTemplate, PluginLiveControllable} from "@pi-tray/types";
 
 const appdata = await dataDir();
 

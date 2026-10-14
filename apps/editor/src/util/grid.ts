@@ -4,7 +4,7 @@ import { join, dataDir } from "@tauri-apps/api/path";
 import {useCallback, useEffect, useState} from "react";
 
 // TODO: we need to do this more properly
-import type { CellData } from "pi-tray-server/src/types"
+import type { CellData } from "@pi-tray/types"
 
 const appdata = await dataDir();
 const GRID_FILE = await join(appdata, "pi-tray", "grid.json");

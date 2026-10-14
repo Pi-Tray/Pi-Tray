@@ -4,7 +4,14 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*"
+      - "image-v*"
+    # client or image changes on main build an artifact to check nothing broke, without publishing
+    branches:
+      - main
+    paths:
+      - "apps/client/**"
+      - "apps/image/**"
+      - ".github/workflows/build-image.yml"
   # releases made in GitHub's web UI, so their images are built and attached to them
   release:
     types:
@@ -19,7 +26,7 @@ permissions:
 # a release made in the web UI can also fire a tag push, so runs for the same release wait for each other
 # rather than racing to upload the same files
 concurrency:
-  group: build-${{ github.event.release.tag_name || github.ref_name }}
+  group: image-${{ github.event.release.tag_name || github.ref_name }}
 
 jobs:
   check:
@@ -46,7 +53,7 @@ jobs:
 
           if [ "${{ github.event_name }}" = "schedule" ]; then
             # one automatic release per base image, so an existing release means it's already been built
-            release_tag="os-$base_image_name"
+            release_tag="image-os-$base_image_name"
 
             if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
               echo "Already built, nothing to do"
@@ -57,15 +64,23 @@ jobs:
 
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "release" ]; then
-            # the release already exists, the build just attaches its files to it
             release_tag="${{ github.event.release.tag_name }}"
-            echo "should_build=true" >> "$GITHUB_OUTPUT"
+
+            # every app's releases fire this, only image ones are built here
+            # image-latest is the rolling release this workflow updates itself, so it's never built from
+            if [[ "$release_tag" == image-* ]] && [ "$release_tag" != "image-latest" ]; then
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "Not an image release, nothing to do"
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+            fi
+
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
           else
             release_tag="${{ github.ref_name }}"
             echo "should_build=true" >> "$GITHUB_OUTPUT"
 
-            # manual runs only produce an artifact, tag pushes publish a release
+            # manual runs and main pushes only produce an artifact, tag pushes publish a release
             if [ "${{ github.ref_type }}" = "tag" ]; then
               echo "should_publish=true" >> "$GITHUB_OUTPUT"
             else
@@ -83,32 +98,30 @@ jobs:
     runs-on: ubuntu-24.04-arm
 
     steps:
-      - name: Check out this repo
+      - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Check out the client
-        uses: actions/checkout@v4
-        with:
-          repository: Pi-Tray/client
-          path: client
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: lts/*
+          cache: pnpm
 
+      # the client from this same commit, so a release always contains the client it was tagged with
       - name: Build the client
-        working-directory: client
         run: |
-          npm ci
-          npm run build
+          pnpm install --frozen-lockfile --filter @pi-tray/client...
+          pnpm --filter @pi-tray/client build
 
       - name: Install image tools
         run: sudo apt-get update && sudo apt-get install -y parted xz-utils
 
       # uses the exact image the check saw, in case a new one is released mid-run
       - name: Build the image
-        run: sudo bash ./build/build-image.sh client/dist out "${{ needs.check.outputs.base_image_url }}"
+        run: sudo bash ./apps/image/build/build-image.sh apps/client/dist out "${{ needs.check.outputs.base_image_url }}"
 
       - name: Point the Imager list at this release
         if: needs.check.outputs.should_publish == 'true'
@@ -130,8 +143,23 @@ jobs:
           release_tag="${{ needs.check.outputs.release_tag }}"
 
           # a release made in the web UI already exists, so attach to it, otherwise create one
+          # never marked latest, as "latest" is shared with every other app's releases in the repo
           if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
             gh release upload "$release_tag" out/* --repo "${{ github.repository }}" --clobber
           else
-            gh release create "$release_tag" out/* --repo "${{ github.repository }}" --title "$release_tag" --generate-notes
+            gh release create "$release_tag" out/* --repo "${{ github.repository }}" --title "$release_tag" --generate-notes --latest=false
           fi
+
+      # Imager's repository url points at this release, so it always lists the newest image
+      - name: Update the rolling image-latest release
+        if: needs.check.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view image-latest --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            gh release create image-latest --repo "${{ github.repository }}" --title "Latest image (for Raspberry Pi Imager)" \
+              --notes "Holds os_list.json for Raspberry Pi Imager, always pointing at the newest image release. Download images from their own releases." \
+              --latest=false
+          fi
+
+          gh release upload image-latest out/os_list.json --repo "${{ github.repository }}" --clobber

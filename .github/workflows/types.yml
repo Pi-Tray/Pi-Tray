@@ -1,0 +1,45 @@
+name: Release types
+
+on:
+  push:
+    tags:
+      - "types-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check the tag matches the package version
+        working-directory: packages/types
+        run: |
+          package_version=$(node -p "require('./package.json').version")
+          if [ "types-v$package_version" != "${{ github.ref_name }}" ]; then
+            echo "Tag ${{ github.ref_name }} doesn't match package version $package_version"
+            exit 1
+          fi
+
+      - name: Build and pack
+        working-directory: packages/types
+        run: |
+          pnpm build
+          pnpm pack --pack-destination ../../out
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" out/*.tgz --title "${{ github.ref_name }}" --notes "Install in a plugin with: npm install -D https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$(basename out/*.tgz)" --latest=false

@@ -1,6 +1,6 @@
 import {Plus, Trash} from "lucide-react";
 
-import type {PluginConfigTemplate} from "pi-tray-server/src/types";
+import type {PluginConfigTemplate} from "@pi-tray/types";
 import {PluginDescription} from "./PluginDescription.tsx";
 
 type TemplateField = PluginConfigTemplate[string];

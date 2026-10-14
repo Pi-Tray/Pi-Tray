@@ -1,6 +1,6 @@
 import {useEffect, useRef, useSyncExternalStore} from "react";
 
-import type {CellData, PluginLiveControllable} from "pi-tray-server/src/types";
+import type {CellData, PluginLiveControllable} from "@pi-tray/types";
 
 import {useWebSocket} from "../contexts/WSProvider";
 

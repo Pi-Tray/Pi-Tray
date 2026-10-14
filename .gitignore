@@ -5,3 +5,5 @@ dist/
 .idea/
 .vscode/*
 !.vscode/extensions.json
+out/
+*.tgz

@@ -1,10 +1,10 @@
 # Pi-Tray Image
 
-A ready-to-flash Raspberry Pi OS Lite image that boots straight into the [Pi-Tray client](https://github.com/Pi-Tray/client) in kiosk mode.
+A ready-to-flash Raspberry Pi OS Lite image that boots straight into the [Pi-Tray client](../client) in kiosk mode.
 
 It runs well on a 1GB Pi: there's no desktop, just Chromium on a bare X server. You can of course skip this image and set up Pi-Tray Client however you like, but the image is a convenient and lightweight way to get going.
 
-You'll also need [Pi-Tray Server](https://github.com/Pi-Tray/server) running on the PC you want to control.
+You'll also need [Pi-Tray Server](../server) running on the PC you want to control.
 
 ## What's in the image
 
@@ -26,7 +26,7 @@ This lets Imager apply your settings.
 
 1. Open [Raspberry Pi Imager](https://www.raspberrypi.com/software/). In its app options, set a custom repository to:
    ```
-   https://github.com/Pi-Tray/image/releases/latest/download/os_list.json
+   https://github.com/Pi-Tray/pi-tray/releases/download/image-latest/os_list.json
    ```
    Or start Imager with `rpi-imager --repo <that address>`.
 2. Choose your Pi model, then pick **Pi-Tray** from the OS list.
@@ -37,7 +37,7 @@ This lets Imager apply your settings.
 
 ### Option 2: Use Custom
 
-1. Download the latest `.img.xz` from [Releases](../../releases). There's no need to unzip it.
+1. Download the latest `.img.xz` from the [image releases](https://github.com/Pi-Tray/pi-tray/releases?q=image-&expanded=true), the ones tagged `image-`. There's no need to unzip it.
 2. In Imager, choose your Pi model, then **Choose OS → Use Custom** and select the file.
 3. Choose your SD card and write it.
 
@@ -146,22 +146,24 @@ If the screen shows **Connecting...** and stays there:
 
 ## Building it yourself
 
-Images are built by GitHub Actions on native arm64 runners. A build runs:
+Images are built by GitHub Actions on native arm64 runners, using the client from the same commit. A build runs:
 
-- on every `v*` tag, which publishes a release
-- weekly, building and releasing automatically whenever Raspberry Pi publishes a new OS Lite image
-- manually from the Actions tab, which produces a downloadable artifact without a release
+- on every `image-v*` tag, which publishes a release
+- weekly, building and releasing automatically (tagged `image-os-<base image>`) whenever Raspberry Pi publishes a new OS Lite image
+- on pushes to `main` that change the client or the image, and manually from the Actions tab, both of which produce a downloadable artifact without a release
 
-To build the image locally you need an **arm64 Linux** machine, such as a Pi 4 or 5 with plenty of free space, or an arm64 VM:
+Every published image also updates the `image-latest` release's `os_list.json`, which is what Raspberry Pi Imager's repository address points at.
+
+To build the image locally you need an **arm64 Linux** machine, such as a Pi 4 or 5 with plenty of free space, or an arm64 VM, plus Node.js and [pnpm](https://pnpm.io). From the root of the monorepo:
 
 ```bash
-git clone https://github.com/Pi-Tray/client
-cd client && npm ci && npm run build && cd ..
+pnpm install --filter @pi-tray/client...
+pnpm --filter @pi-tray/client build
 
 sudo apt install parted xz-utils
-sudo bash ./build/build-image.sh client/dist out
+sudo bash ./apps/image/build/build-image.sh apps/client/dist out
 ```
 
 The image and `os_list.json` end up in `out/`.
 
-Every build runs `build/check-image.sh`. It fails the build if the image contains SSH host keys, `authorized_keys`, password hashes, a machine ID, shell history, Wi-Fi passwords or an `admin.txt`, or if any part of the kiosk or its first-boot setup is missing.
+Every build runs `apps/image/build/check-image.sh`. It fails the build if the image contains SSH host keys, `authorized_keys`, password hashes, a machine ID, shell history, Wi-Fi passwords or an `admin.txt`, or if any part of the kiosk or its first-boot setup is missing.
