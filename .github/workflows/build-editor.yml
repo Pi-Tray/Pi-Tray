@@ -113,8 +113,8 @@ jobs:
           # End the multi-line string with the delimiter
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      # This step uploads the build artifacts.
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: pi-tray-editor-${{ matrix.platform }}-${{ matrix.args || 'default' }}-${{
+          name: pi-tray-editor-${{ matrix.platform }}-${{ matrix.args || 'default' }}-${{ steps.tauri-build.outputs.appVersion }}
+          path: ${{ steps.prep_paths.outputs.paths }}
