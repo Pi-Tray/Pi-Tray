@@ -6,7 +6,7 @@
     "type": "module",
     "scripts": {
         "dev": "tauri dev",
-        "dev:vite": "vite",
+        "dev:vite": "pnpm --filter @pi-tray/editor-sidecar build && vite",
         "build": "tsc && vite build && pnpm --filter @pi-tray/editor-sidecar build",
         "preview": "vite preview",
         "tauri": "tauri"
