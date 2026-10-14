@@ -1,6 +1,6 @@
 /**
  * The action to perform in a WebSocket message.<br>
- * E.g. "hello", "set_cell", "push", etc.
+ * E.g. "hello", "set_cells", "push", etc.
  */
 export type MessageAction = string;
 

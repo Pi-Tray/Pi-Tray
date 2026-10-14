@@ -120,15 +120,18 @@ export const PushButton = ({x, y, style, className}: PushButtonProps) => {
                         }, 1000);
                     }
                     break;
-                case "set_cell":
-                    if (data.payload.x === x && data.payload.y === y) {
-                        button_log("Server set cell:", data.payload.text, "is icon:", data.payload.is_icon, "background:", data.payload.background);
-                        setText(data.payload.text);
-                        setTextIsIcon(data.payload.is_icon || false);
-                        setBackgroundURL(resolve_asset_url(data.payload.background, (event.target as WebSocket).url));
-                        setPushable(data.payload.pushable ?? true);
+                case "set_cells": {
+                    // TODO: move this to a higher component/context so each button isnt parsing json
+                    const cell = data.payload.find((payload) => payload.x === x && payload.y === y);
+                    if (cell) {
+                        button_log("Server set cell:", cell.text, "is icon:", cell.is_icon, "background:", cell.background);
+                        setText(cell.text);
+                        setTextIsIcon(cell.is_icon || false);
+                        setBackgroundURL(resolve_asset_url(cell.background, (event.target as WebSocket).url));
+                        setPushable(cell.pushable ?? true);
                     }
                     break;
+                }
             }
         },
         [x, y, button_log]

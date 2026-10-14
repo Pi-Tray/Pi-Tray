@@ -37,20 +37,21 @@ const asset_id_from_url = (url: string | null): string | null => {
 const handle_message = (event: MessageEvent) => {
     const message = parse_server_message(event.data);
 
-    if (message?.action !== "set_cell" || !message.payload) {
+    if (message?.action !== "set_cells" || !Array.isArray(message.payload)) {
         return;
     }
 
-    const {x, y, text, is_icon, background} = message.payload;
-    if (typeof x !== "number" || typeof y !== "number") {
-        return;
-    }
+    for (const {x, y, text, is_icon, background} of message.payload) {
+        if (typeof x !== "number" || typeof y !== "number") {
+            continue;
+        }
 
-    live_cells.set(cell_key(y, x), {
-        text: typeof text === "string" ? text : "",
-        text_is_icon: is_icon === true,
-        background: asset_id_from_url(background)
-    });
+        live_cells.set(cell_key(y, x), {
+            text: typeof text === "string" ? text : "",
+            text_is_icon: is_icon === true,
+            background: asset_id_from_url(background)
+        });
+    }
 
     notify();
 }

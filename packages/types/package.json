@@ -16,7 +16,10 @@
     ],
     "scripts": {
         "build": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type: 'module'}))\"",
-        "prepare": "pnpm build"
+        "prepare": "pnpm build",
+        "dev": "pnpm run \"/^watch:/\"",
+        "watch:cjs": "tsc -p tsconfig.json -w --preserveWatchOutput",
+        "watch:esm": "tsc -p tsconfig.esm.json -w --preserveWatchOutput"
     },
     "devDependencies": {
         "typescript": "^5.6.0"

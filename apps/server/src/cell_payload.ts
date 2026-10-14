@@ -4,6 +4,7 @@ import {unwrap_plugin_reference} from "./types";
 import {resolve_asset_url} from "./assets";
 import {get_live_state} from "./live/state";
 import {load_plugin} from "./plugins";
+import {GridData} from "./data";
 
 /**
  * Whether pressing a cell does anything, so clients can skip press feedback for cells that don't.
@@ -45,4 +46,22 @@ export const build_cell_payload = (col_idx: number, row_idx: number, cell: CellD
         background: resolve_asset_url(cell?.background),
         pushable: is_pushable(cell)
     };
+}
+
+/**
+ * Builds the payload for every filled cell in the grid, for sending the whole grid in one set_cells.
+ * @param grid the grid to build payloads for
+ */
+export const build_grid_payload = (grid: GridData): CellPayload[] => {
+    const payloads: CellPayload[] = [];
+
+    for (const [row_key, row] of Object.entries(grid)) {
+        for (const [col_key, cell] of Object.entries(row)) {
+            if (cell) {
+                payloads.push(build_cell_payload(Number(col_key), Number(row_key), cell));
+            }
+        }
+    }
+
+    return payloads;
 }

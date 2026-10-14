@@ -10,7 +10,8 @@
     ],
     "scripts": {
         "build": "tsc",
-        "prepare": "tsc"
+        "prepare": "tsc",
+        "dev": "tsc -w --preserveWatchOutput"
     },
     "devDependencies": {
         "@types/node": "^24.2.1",

@@ -27,7 +27,7 @@ export interface CellCoordinates {
 }
 
 export type ServerMessage =
-    | {action: "set_cell", payload: CellPayload}
+    | {action: "set_cells", payload: CellPayload[]}
     | {action: "size", payload: {rows: number, cols: number}}
     | {action: "push_ok", payload: CellCoordinates}
     | {action: "push_error", payload: CellCoordinates}
