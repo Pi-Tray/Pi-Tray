@@ -2,7 +2,7 @@ import {find_plugin_problems, Plugin} from "./types";
 
 import fs from "fs";
 import {createRequire} from "module";
-import {in_plugin_env} from "./data";
+import {in_plugin_env} from "@pi-tray/paths";
 
 // create a custom require resolver that looks at the node_modules of the plugin-env directory
 const require_from_plugin_env = createRequire(in_plugin_env("package.json"));
