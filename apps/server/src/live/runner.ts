@@ -1,4 +1,4 @@
-import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS} from "../types";
+import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS, unwrap_plugin_reference} from "../types";
 
 import {add_grid_change_listener, get_loaded_grid} from "../data";
 import {add_plugin_cache_clear_listener, load_plugin} from "../plugins";
@@ -66,8 +66,7 @@ const find_desired_tiles = (): Map<string, DesiredTile> => {
                 continue;
             }
 
-            const plugin_name = typeof cell.plugin === "string" ? cell.plugin : cell.plugin.name;
-            const config = (typeof cell.plugin === "string" ? undefined : cell.plugin.config) || {};
+            const {name: plugin_name, config} = unwrap_plugin_reference(cell.plugin);
 
             let plugin: Plugin;
             try {

@@ -2,6 +2,7 @@ import type {MessageHandler} from "../types";
 
 import {get_loaded_grid} from "../data";
 import {load_plugin} from "../plugins";
+import {unwrap_plugin_reference} from "../types";
 import {plugin_context} from "../plugin_context";
 
 export default (async (ws, payload) => {
@@ -13,10 +14,9 @@ export default (async (ws, payload) => {
         return;
     }
 
-    const plugin_name = typeof cell.plugin === "string" ? cell.plugin : cell.plugin.name;
+    const {name: plugin_name, config: plugin_config} = unwrap_plugin_reference(cell.plugin);
 
     try {
-        const plugin_config = typeof cell.plugin === "string" ? undefined : cell.plugin.config;
 
         const plugin = load_plugin(plugin_name);
 

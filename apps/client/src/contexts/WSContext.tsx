@@ -1,4 +1,5 @@
 import {createContext, useCallback, useContext, useEffect, useRef, useState} from "react";
+import {parse_server_message} from "@pi-tray/types";
 
 const WSContext = createContext<WebSocket | null>(null);
 
@@ -80,8 +81,8 @@ export const WSProvider = ({ url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF
 
         // handle reload messages
         ws.addEventListener("message", (event) => {
-            const data = JSON.parse(event.data);
-            if (data.action === "reload") {
+            const data = parse_server_message(event.data);
+            if (data?.action === "reload") {
                 location.reload();
             }
         });

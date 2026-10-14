@@ -4,6 +4,7 @@ import {CSSProperties, useCallback, useEffect, useRef, useState} from "react";
 
 import styles from "./component.module.css";
 import {useWebSocket, useWebSocketReadyStateChange} from "../../contexts/WSContext.tsx";
+import {parse_server_message} from "@pi-tray/types";
 
 interface BasePushButtonGridProps {
     className?: string;
@@ -145,17 +146,17 @@ export const PushButtonGrid = ({ rows, cols, className, button_className, reques
  * @constructor
  */
 export const WSPushButtonGrid = ({ className, button_className }: BasePushButtonGridProps) => {
-    const [rows, setRows] = useState(null);
-    const [cols, setCols] = useState(null);
+    const [rows, setRows] = useState<number | null>(null);
+    const [cols, setCols] = useState<number | null>(null);
 
     const ws = useWebSocket();
 
     // load grid size from server
     const handle_message = useCallback(
         (event: MessageEvent) => {
-            const data = JSON.parse(event.data);
+            const data = parse_server_message(event.data);
 
-            if (data.action === "size") {
+            if (data?.action === "size") {
                 console.log("Received grid size:", data.payload);
 
                 setRows(data.payload.rows);

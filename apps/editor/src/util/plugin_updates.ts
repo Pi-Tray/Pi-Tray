@@ -1,12 +1,10 @@
 import {exists, readTextFile} from "@tauri-apps/plugin-fs";
-import {dataDir, join} from "@tauri-apps/api/path";
 
 import {clear_plugin_info_cache, install_package} from "./plugins";
+import {in_plugin_env} from "./paths";
 
-const appdata = await dataDir();
-const plugin_env = await join(appdata, "pi-tray", "plugin-env");
-const package_json_path = await join(plugin_env, "package.json");
-const package_lock_path = await join(plugin_env, "package-lock.json");
+const package_json_path = await in_plugin_env("package.json");
+const package_lock_path = await in_plugin_env("package-lock.json");
 
 export type PackageSource =
     | { kind: "github", owner: string, repo: string, ref: string | null }

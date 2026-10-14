@@ -10,6 +10,8 @@
         "preview": "vite preview"
     },
     "dependencies": {
+        "@pi-tray/ui": "workspace:*",
+        "@pi-tray/types": "workspace:*",
         "lucide-react": "^1.49.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",

@@ -1,19 +1,20 @@
 import {useSyncExternalStore} from "react";
 
 import {exists, mkdir, readDir, readFile, readTextFile, remove, stat, watch, writeFile, writeTextFile} from "@tauri-apps/plugin-fs";
-import {dataDir, join} from "@tauri-apps/api/path";
+import {join} from "@tauri-apps/api/path";
 
-export const ASSET_EXTENSIONS = ["png", "jpg", "jpeg", "webp", "gif", "svg"];
+import {ASSET_CONTENT_TYPES, ASSET_EXTENSIONS, ASSET_FILE_PATTERN, AssetExtension} from "@pi-tray/types";
+
+import {in_data_dir} from "./paths";
+
+export {ASSET_EXTENSIONS};
+
 export const ASSET_ACCEPT = ASSET_EXTENSIONS.map(extension => `.${extension}`).join(",");
 
 // stops a huge file being added by accident, every client downloads each asset it shows
 export const MAX_ASSET_BYTES = 10 * 1024 * 1024;
 
-// same as the server's pattern, so the editor never writes a file the server would refuse to serve
-const ASSET_FILE_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(png|jpe?g|webp|gif|svg)$/;
-
-const appdata = await dataDir();
-const assets_dir = await join(appdata, "pi-tray", "assets");
+const assets_dir = await in_data_dir("assets");
 
 export interface Asset {
     /**
@@ -68,7 +69,7 @@ const name_without_extension = (file_name: string) => {
 const validate_asset_file = (file: File): string => {
     const extension = extension_of(file.name);
 
-    if (!ASSET_EXTENSIONS.includes(extension)) {
+    if (!(ASSET_EXTENSIONS as readonly string[]).includes(extension)) {
         throw new Error(`Unsupported file type ".${extension}", expected one of: ${ASSET_EXTENSIONS.join(", ")}`);
     }
 
@@ -146,7 +147,7 @@ const load_assets = async (): Promise<Asset[]> => {
             }
 
             const bytes = await readFile(await join(assets_dir, image.file_name));
-            const mime_type = image.extension === "svg" ? "image/svg+xml" : `image/${image.extension === "jpg" ? "jpeg" : image.extension}`;
+            const mime_type = ASSET_CONTENT_TYPES[image.extension as AssetExtension];
 
             cached_preview = {version: image.version, url: URL.createObjectURL(new Blob([bytes], {type: mime_type}))};
             preview_cache.set(asset_id, cached_preview);

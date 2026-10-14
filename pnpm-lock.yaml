@@ -12,6 +12,12 @@ importers:
 
   apps/client:
     dependencies:
+      '@pi-tray/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+      '@pi-tray/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       lucide-react:
         specifier: ^1.49.0
         version: 1.56.0(@types/react@19.3.0)(react@19.3.0)
@@ -64,6 +70,9 @@ importers:
       '@pi-tray/types':
         specifier: workspace:*
         version: link:../../packages/types
+      '@pi-tray/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@tailwindcss/vite':
         specifier: ^4.1.11
         version: 4.3.3(vite@6.4.4(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15))
@@ -139,6 +148,13 @@ importers:
         version: 6.4.4(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)
 
   apps/editor/sidecar:
+    dependencies:
+      '@pi-tray/paths':
+        specifier: workspace:*
+        version: link:../../../packages/paths
+      '@pi-tray/types':
+        specifier: workspace:*
+        version: link:../../../packages/types
     devDependencies:
       '@types/node':
         specifier: ^24.2.1
@@ -152,6 +168,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@pi-tray/paths':
+        specifier: workspace:*
+        version: link:../../packages/paths
       '@pi-tray/types':
         specifier: workspace:*
         version: link:../../packages/types
@@ -175,12 +194,29 @@ importers:
         specifier: ^5.9.2
         version: 5.9.3
 
-  packages/types:
-    dependencies:
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.2
+  packages/paths:
     devDependencies:
+      '@types/node':
+        specifier: ^24.2.1
+        version: 24.19.2
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
+  packages/types:
+    devDependencies:
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+
+  packages/ui:
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.1
+        version: 18.3.31
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
       typescript:
         specifier: ^5.6.0
         version: 5.9.3

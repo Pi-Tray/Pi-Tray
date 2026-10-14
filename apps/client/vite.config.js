@@ -7,4 +7,8 @@ import viteTsconfigPaths from 'vite-tsconfig-paths'
 export default defineConfig({
   base: "./",
   plugins: [react(), viteTsconfigPaths()],
+  resolve: {
+    // packages/ui has its own react for typechecking, this makes it use the client's at runtime
+    dedupe: ["react", "react-dom"],
+  },
 })

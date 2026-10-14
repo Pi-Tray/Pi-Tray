@@ -1,11 +1,12 @@
 import {useWebSocket} from "../../contexts/WSContext.tsx";
 import {useEffect, useState, useCallback} from "react";
 
-import {AutoTextScale} from "../AutoTextScale";
+import {AutoTextScale} from "@pi-tray/ui/AutoTextScale";
 
 import {DynamicIcon} from "lucide-react/dynamic";
 
 import styles from "./component.module.css";
+import {parse_server_message} from "@pi-tray/types";
 
 /**
  * Resolves an asset path from the server (e.g. `/assets/<id>.png?v=123`) against the server's address.<br>
@@ -94,9 +95,9 @@ export const PushButton = ({x, y, style, className}: PushButtonProps) => {
     // handle various messages from the server
     const handle_message = useCallback(
         (event: MessageEvent) => {
-            const data = JSON.parse(event.data);
+            const data = parse_server_message(event.data);
 
-            switch (data.action) {
+            switch (data?.action) {
                 case "push_ok":
                     if (data.payload.x === x && data.payload.y === y) {
                         button_log("Server acknowledged push.");

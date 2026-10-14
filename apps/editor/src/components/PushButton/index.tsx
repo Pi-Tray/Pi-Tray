@@ -1,7 +1,7 @@
 import {useCallback} from "react";
 import {useGridCell} from "../../util/grid";
 
-import {AutoTextScale} from "../AutoTextScale";
+import {AutoTextScale} from "@pi-tray/ui/AutoTextScale";
 
 import styles from "./component.module.css";
 import {CustomDynamicIcon} from "../CustomDynamicIcon.tsx";

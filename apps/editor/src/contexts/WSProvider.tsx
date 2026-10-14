@@ -24,7 +24,7 @@ export const WSProvider = ({ url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF
 
     const reconnect_attempts = useRef(0);
     // TODO: this is browser code, right? it should be a number type, why is typescript forcing us to use NodeJS.Timeout?
-    const backoff_timeout = useRef<NodeJS.Timeout | null>(null);
+    const backoff_timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const force_closed = useRef(false);
 

@@ -16,6 +16,7 @@
     "author": "obfuscatedgenerated",
     "license": "MIT",
     "dependencies": {
+        "@pi-tray/paths": "workspace:*",
         "@pi-tray/types": "workspace:*",
         "@types/ws": "^8.18.1",
         "minimist": "^1.2.8",

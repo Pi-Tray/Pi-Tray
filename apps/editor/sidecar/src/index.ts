@@ -1,23 +1,7 @@
-import path from "path";
 import {createRequire} from "module";
 
-// thanks https://stackoverflow.com/a/26227660/19678893
-const appdata_root = process.env.APPDATA || (process.platform === "darwin" ? process.env.HOME + "/Library/Application Support" : process.env.HOME + "/.config");
-
-// returns the path relative to the appdata root directory
-const appdata = (in_path: string): string => {
-    return path.join(appdata_root, in_path);
-}
-
-const data_dir = appdata("pi-tray");
-const in_data_dir = (in_path: string): string => {
-    return path.join(data_dir, in_path);
-}
-
-const plugin_env = in_data_dir("plugin-env");
-const in_plugin_env = (in_path: string): string => {
-    return path.join(plugin_env, in_path);
-}
+import {in_plugin_env} from "@pi-tray/paths";
+import {find_plugin_problems} from "@pi-tray/types";
 
 const command = process.argv[2];
 
@@ -57,10 +41,14 @@ switch (command) {
         const info_require = createRequire(in_plugin_env("package.json"));
         try {
             const pkg = info_require(info_pkg_name);
-            const plugin_info: Record<string, { display_name?: string, description?: string, config_template?: unknown, live_controls?: unknown, pushable?: unknown }> = {};
+            const plugin_info: Record<string, { display_name?: string, description?: string, config_template?: unknown, live_controls?: unknown, pushable?: unknown, problems?: string[] }> = {};
 
             for (const [plugin_key, plugin] of Object.entries<any>(pkg || {})) {
+                // the same checks the server runs before using a plugin, so the editor can warn about broken ones
+                const problems = find_plugin_problems(plugin);
+
                 plugin_info[plugin_key] = {
+                    problems: problems.length > 0 ? problems : undefined,
                     display_name: plugin?.display_name,
                     description: plugin?.description,
                     config_template: plugin?.config_template,

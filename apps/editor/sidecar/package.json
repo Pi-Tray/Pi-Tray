@@ -16,5 +16,9 @@
         "@yao-pkg/pkg": "^6.6.0",
         "typescript": "^5.9.2"
     },
-    "private": true
+    "private": true,
+    "dependencies": {
+        "@pi-tray/paths": "workspace:*",
+        "@pi-tray/types": "workspace:*"
+    }
 }

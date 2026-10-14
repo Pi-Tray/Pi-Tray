@@ -1,4 +1,5 @@
-import type {CellData} from "./types";
+import type {CellData, CellPayload} from "./types";
+import {unwrap_plugin_reference} from "./types";
 
 import {resolve_asset_url} from "./assets";
 import {get_live_state} from "./live/state";
@@ -12,7 +13,7 @@ const is_pushable = (cell: CellData | undefined): boolean => {
         return false;
     }
 
-    const plugin_name = typeof cell.plugin === "string" ? cell.plugin : cell.plugin.name;
+    const plugin_name = unwrap_plugin_reference(cell.plugin).name;
 
     try {
         return typeof load_plugin(plugin_name).handle_push === "function";
@@ -28,7 +29,7 @@ const is_pushable = (cell: CellData | undefined): boolean => {
  * @param row_idx the cell's row, sent as y
  * @param cell the cell's data, or undefined for an empty cell
  */
-export const build_cell_payload = (col_idx: number, row_idx: number, cell: CellData | undefined) => {
+export const build_cell_payload = (col_idx: number, row_idx: number, cell: CellData | undefined): CellPayload => {
     // live values from plugins win over the stored ones, field by field
     const live_state = get_live_state(row_idx, col_idx);
     if (cell && live_state) {

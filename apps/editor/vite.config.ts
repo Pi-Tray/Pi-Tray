@@ -9,6 +9,10 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // packages/ui has its own react for typechecking, this makes it use the editor's at runtime
+    dedupe: ["react", "react-dom"],
+  },
   build: {
       target: "esnext"
   },

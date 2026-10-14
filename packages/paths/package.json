@@ -1,0 +1,19 @@
+{
+    "name": "@pi-tray/paths",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Where Pi-Tray keeps its data on disk, for the Node.js parts (server, editor sidecar, scripts)",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist"
+    ],
+    "scripts": {
+        "build": "tsc",
+        "prepare": "tsc"
+    },
+    "devDependencies": {
+        "@types/node": "^24.2.1",
+        "typescript": "^5.6.0"
+    }
+}

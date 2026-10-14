@@ -4,27 +4,11 @@ import fs from "fs";
 import path from "path";
 
 import {in_data_dir} from "./data";
+import {ASSET_CONTENT_TYPES, ASSET_FILE_PATTERN, ASSET_ID_PATTERN, ASSET_PATH_PATTERN, AssetExtension} from "./types";
 
 export const assets_dir = in_data_dir("assets");
 fs.mkdirSync(assets_dir, {recursive: true});
 
-const CONTENT_TYPES: Record<string, string> = {
-    png: "image/png",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    webp: "image/webp",
-    gif: "image/gif",
-    svg: "image/svg+xml",
-};
-
-// a lowercase uuid with an allowed image extension, so nothing else in the data dir can ever be requested
-const ASSET_PATH_PATTERN = /^\/assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(png|jpe?g|webp|gif|svg)$/;
-
-// just the id part, for validating ids that come from grid.json before touching the filesystem
-const ASSET_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
-// matches asset image files in the folder, capturing the id
-const ASSET_FILE_PATTERN = /^([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.(png|jpe?g|webp|gif|svg)$/;
 
 /**
  * Turns an asset id into the url clients should load it from, e.g. `/assets/<id>.png?v=<mtime>`.<br>
@@ -126,7 +110,7 @@ export const handle_asset_request = (request: IncomingMessage, response: ServerR
         }
 
         response.writeHead(200, {
-            "Content-Type": CONTENT_TYPES[extension],
+            "Content-Type": ASSET_CONTENT_TYPES[extension as AssetExtension],
             "Content-Length": stats.size,
             // urls carry ?v=<mtime>, so a replaced file gets a new url and this can be cached forever
             "Cache-Control": "public, max-age=31536000, immutable",

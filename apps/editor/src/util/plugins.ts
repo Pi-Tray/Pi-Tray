@@ -1,17 +1,16 @@
 import {useEffect, useMemo, useState} from "react";
 
-import {dataDir, join} from "@tauri-apps/api/path";
 import {readTextFile, watch} from "@tauri-apps/plugin-fs";
 import {Command} from "@tauri-apps/plugin-shell";
 import {platform} from "@tauri-apps/plugin-os";
 
 // TODO: does pi-tray want to be a monorepo?
-import type {PluginReference, PluginConfigTemplate, PluginLiveControllable} from "@pi-tray/types";
+import type {PluginConfigTemplate, PluginLiveControllable} from "@pi-tray/types";
 
-const appdata = await dataDir();
+import {in_plugin_env, plugin_env} from "./paths";
 
-const plugin_env = await join(appdata, "pi-tray", "plugin-env");
-const package_json = await join(plugin_env, "package.json");
+
+const package_json = await in_plugin_env("package.json");
 
 /**
  * Lists the package names of installed plugins by reading the `package.json` file in the plugin-env directory.
@@ -150,6 +149,11 @@ export interface PluginInfo {
     config_template?: PluginConfigTemplate;
     live_controls?: PluginLiveControllable[];
     pushable?: boolean;
+
+    /**
+     * Why the server would refuse to run this plugin, if it would. Checked by the sidecar with the server's own rules.
+     */
+    problems?: string[];
 }
 
 // keyed by package name, cleared whenever the installed packages change
@@ -264,6 +268,11 @@ export interface IndexedPlugin {
      * Whether the plugin updates its button live, e.g. a clock.
      */
     live: boolean;
+
+    /**
+     * Why the server would refuse to run this plugin, if it would.
+     */
+    problems?: string[];
 }
 
 export interface PackagePlugins {
@@ -305,7 +314,8 @@ export const usePluginIndex = () => {
                         display_name: info.display_name || plugin_key,
                         description: info.description,
                         configurable: !!info.config_template && Object.keys(info.config_template).length > 0,
-                        live: (info.live_controls?.length ?? 0) > 0
+                        live: (info.live_controls?.length ?? 0) > 0,
+                        problems: info.problems
                     }))
                 };
             } catch (error) {
@@ -338,13 +348,8 @@ export const usePluginList = () => {
     );
 }
 
-export const unwrap_plugin_reference = (plugin_ref: PluginReference) => {
-    if (typeof plugin_ref === "string") {
-        return {name: plugin_ref, config: {}};
-    }
-
-    return {name: plugin_ref.name, config: plugin_ref.config || {}};
-}
+// shared with the server, re-exported so the editor's existing imports keep working
+export {unwrap_plugin_reference} from "@pi-tray/types";
 
 // watch the folder rather than the files, as package-lock.json doesn't exist until the first install and watching a missing file fails
 // package.json changes on install/uninstall, package-lock.json also changes when a git package is updated in place

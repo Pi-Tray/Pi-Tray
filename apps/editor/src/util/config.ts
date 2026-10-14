@@ -1,10 +1,9 @@
 import {exists, writeTextFile, readTextFile, watch} from "@tauri-apps/plugin-fs";
-import { join, dataDir } from "@tauri-apps/api/path";
+import {in_data_dir} from "./paths";
 
 import { useEffect, useState } from "react";
 
-const appdata = await dataDir();
-const CONFIG_FILE = await join(appdata, "pi-tray", "editor.json");
+const CONFIG_FILE = await in_data_dir("editor.json");
 
 // explicitly declare something as undefined here is you don't want to set a default value
 // we are using the keys of defaults as types for the config getters and setters so it needs to be declared here

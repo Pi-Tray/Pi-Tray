@@ -1,25 +1,7 @@
 const fs = require("fs");
-const path = require("path");
 const { execSync } = require("child_process");
 
-// thanks https://stackoverflow.com/a/26227660/19678893
-const appdata_root = process.env.APPDATA || (process.platform === "darwin" ? process.env.HOME + "/Library/Application Support" : process.env.HOME + "/.config");
-
-// returns the path relative to the appdata root directory
-const appdata = (in_path) => {
-    return path.join(appdata_root, in_path);
-}
-
-const data_dir = appdata("pi-tray");
-const in_data_dir = (in_path) => {
-    return path.join(data_dir, in_path);
-}
-
-
-const plugin_env = in_data_dir("plugin-env");
-const in_plugin_env = (in_path) => {
-    return path.join(plugin_env, in_path);
-}
+const {in_plugin_env, plugin_env} = require("@pi-tray/paths");
 
 const package_json_path = in_plugin_env("package.json");
 const readme_path = in_plugin_env("README.txt");

@@ -1,17 +1,11 @@
-import path from "path";
 import fs from "fs";
 
 import type { CellData } from "./types";
 
-import {data_dir, in_data_dir} from "./paths";
-export {data_dir, in_data_dir};
+import {data_dir, in_data_dir, in_plugin_env, plugin_env} from "./paths";
+export {data_dir, in_data_dir, in_plugin_env, plugin_env};
 
 fs.mkdirSync(data_dir, {recursive: true});
-
-export const plugin_env = in_data_dir("plugin-env");
-export const in_plugin_env = (in_path: string): string => {
-    return path.join(plugin_env, in_path);
-}
 
 
 const grid_file_path = in_data_dir("grid.json");

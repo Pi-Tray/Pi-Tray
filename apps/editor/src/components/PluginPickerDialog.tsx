@@ -167,6 +167,10 @@ export const PluginPickerDialog = ({open, onClose, onPick, current}: PluginPicke
                                             <span className="font-mono text-xs opacity-60">{plugin.name}</span>
 
                                             {plugin.description && <PluginDescription>{plugin.description}</PluginDescription>}
+
+                                            {plugin.problems && (
+                                                <p className="text-sm text-warning">The server won't run this plugin: {plugin.problems.join("; ")}</p>
+                                            )}
                                         </li>
                                     );
                                 })}

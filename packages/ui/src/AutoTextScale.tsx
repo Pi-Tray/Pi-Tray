@@ -1,7 +1,4 @@
-import {useState, useLayoutEffect, useRef, CSSProperties} from 'react';
-
-// copied exactly from the client
-// TODO: would be good to have some unified component package rather than duplicating this code by hand
+import {useState, useLayoutEffect, useRef, CSSProperties} from "react";
 
 type AutoTextScaleProps = {
     children: string;

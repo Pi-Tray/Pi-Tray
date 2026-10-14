@@ -1,4 +1,4 @@
-import {Plugin, PLUGIN_LIVE_CONTROLLABLE, PluginLiveControllable} from "./types";
+import {find_plugin_problems, Plugin} from "./types";
 
 import fs from "fs";
 import {createRequire} from "module";
@@ -48,60 +48,6 @@ export const clear_plugin_cache = () => {
     }
 
     plugin_module_paths.clear();
-}
-
-// fails to compile if a controllable field is added to the type but not to the list above
-type MissingLiveControllable = Exclude<PluginLiveControllable, typeof PLUGIN_LIVE_CONTROLLABLE[number]>;
-const live_controllable_fields_complete: [MissingLiveControllable] extends [never] ? true : never = true;
-void live_controllable_fields_complete;
-
-/**
- * Checks a module's default export looks like a plugin.
- * @param plugin the default export
- * @returns every problem found, empty if it's valid
- */
-const find_plugin_problems = (plugin: any): string[] => {
-    const problems: string[] = [];
-
-    if (!plugin || typeof plugin !== "object") {
-        return ["the default export isn't an object"];
-    }
-
-    if (plugin.handle_push !== undefined && typeof plugin.handle_push !== "function") {
-        problems.push("handle_push must be a function");
-    }
-
-    if (plugin.live !== undefined) {
-        const live = plugin.live;
-
-        if (!live || typeof live !== "object") {
-            problems.push("live must be an object");
-        } else {
-            if (typeof live.init !== "function") {
-                problems.push("live.init must be a function");
-            }
-
-            if (!Array.isArray(live.controls) || live.controls.length === 0) {
-                problems.push("live.controls must be a non-empty array");
-            } else {
-                for (const field of live.controls) {
-                    if (!PLUGIN_LIVE_CONTROLLABLE.includes(field)) {
-                        problems.push(`live.controls has unknown field "${field}", expected one of: ${PLUGIN_LIVE_CONTROLLABLE.join(", ")}`);
-                    }
-                }
-            }
-        }
-    }
-
-    if (plugin.handle_push === undefined && plugin.live === undefined) {
-        problems.push("it needs a handle_push function, a live object, or both");
-    }
-
-    if (plugin.display_name !== undefined && typeof plugin.display_name !== "string") {
-        problems.push("display_name must be a string");
-    }
-
-    return problems;
 }
 
 /**

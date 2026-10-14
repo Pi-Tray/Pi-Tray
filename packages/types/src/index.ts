@@ -1,5 +1,3 @@
-import type WebSocket from "ws";
-
 /**
  * The action to perform in a WebSocket message.<br>
  * E.g. "hello", "set_cell", "push", etc.
@@ -16,13 +14,6 @@ export interface MessageData {
     payload: MessagePayload;
 }
 
-/**
- * A function that handles a WebSocket message.<br>
- * Each module (except `index.ts`) in the `src/handlers` directory should export a default function with this signature.<br>
- * Then it should be added as an export in `src/handlers/index.ts`.<br>
- * The name of the export should match the action it handles.
- */
-export type MessageHandler = (ws: WebSocket, data: MessagePayload) => Promise<void>;
 
 export interface PluginConfigReference {
     /**
@@ -60,6 +51,17 @@ export interface CellData {
 }
 
 
+/**
+ * The parts of a client's connection a plugin can use.<br>
+ * A minimal interface rather than the ws library's type, so plugins don't need @types/ws.
+ */
+export interface PluginSocket {
+    /**
+     * Sends a message to the client, e.g. JSON.stringify({action: "...", payload: {...}}).
+     */
+    send(data: string): void;
+}
+
 interface PluginPushHandlerData {
     /**
      * The x coordinate of the button that was pushed.
@@ -77,9 +79,9 @@ interface PluginPushHandlerData {
     config?: { [key: string]: any } | undefined;
 
     /**
-     * The open WebSocket connection to the client.
+     * The connection to the client that pushed the button.
      */
-    ws: WebSocket;
+    ws: PluginSocket;
 }
 
 export type PluginPushHandler = (data: PluginPushHandlerData) => Promise<void>;
@@ -235,3 +237,7 @@ export interface Plugin<Controls extends PluginLiveControllable = PluginLiveCont
      */
     live?: PluginLiveConfig<Controls>;
 }
+
+export * from "./assets.js";
+export * from "./plugins.js";
+export * from "./messages.js";

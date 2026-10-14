@@ -1,13 +1,12 @@
 import {exists, writeTextFile, readTextFile, watch} from "@tauri-apps/plugin-fs";
-import { join, dataDir } from "@tauri-apps/api/path";
+import {in_data_dir} from "./paths";
 
 import {useCallback, useEffect, useState} from "react";
 
 // TODO: we need to do this more properly
 import type { CellData } from "@pi-tray/types"
 
-const appdata = await dataDir();
-const GRID_FILE = await join(appdata, "pi-tray", "grid.json");
+const GRID_FILE = await in_data_dir("grid.json");
 
 // TODO: this is slapped together from the config code, could be cleaner
 

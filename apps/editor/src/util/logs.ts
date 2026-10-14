@@ -1,10 +1,11 @@
 import {useEffect, useState} from "react";
 
 import {exists, open, readDir, SeekMode, stat, watch} from "@tauri-apps/plugin-fs";
-import {dataDir, join} from "@tauri-apps/api/path";
+import {join} from "@tauri-apps/api/path";
 
-const appdata = await dataDir();
-export const logs_dir = await join(appdata, "pi-tray", "logs");
+import {in_data_dir} from "./paths";
+
+export const logs_dir = await in_data_dir("logs");
 
 export interface LogSource {
     label: string;

@@ -11,6 +11,7 @@
         "tauri": "tauri"
     },
     "dependencies": {
+        "@pi-tray/ui": "workspace:*",
         "@fontsource-variable/dm-sans": "^5.2.6",
         "@pi-tray/types": "workspace:*",
         "@tailwindcss/vite": "^4.1.11",

@@ -1,6 +1,7 @@
 import {useEffect, useRef, useSyncExternalStore} from "react";
 
 import type {CellData, PluginLiveControllable} from "@pi-tray/types";
+import {ASSET_PATH_PATTERN, parse_server_message} from "@pi-tray/types";
 
 import {useWebSocket} from "../contexts/WSProvider";
 
@@ -25,24 +26,16 @@ const notify = () => {
 }
 
 // asset urls look like /assets/<uuid>.<ext>?v=<version>, only the uuid matters to the editor
-const ASSET_ID_IN_URL = /\/assets\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\./;
-
-const asset_id_from_url = (url: unknown): string | null => {
-    if (typeof url !== "string") {
+const asset_id_from_url = (url: string | null): string | null => {
+    if (!url) {
         return null;
     }
 
-    return url.match(ASSET_ID_IN_URL)?.[1] ?? null;
+    return url.split("?")[0].match(ASSET_PATH_PATTERN)?.[1] ?? null;
 }
 
 const handle_message = (event: MessageEvent) => {
-    let message: any;
-
-    try {
-        message = JSON.parse(event.data);
-    } catch {
-        return;
-    }
+    const message = parse_server_message(event.data);
 
     if (message?.action !== "set_cell" || !message.payload) {
         return;
