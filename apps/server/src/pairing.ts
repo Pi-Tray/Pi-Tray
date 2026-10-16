@@ -1,6 +1,12 @@
 import {timingSafeEqual} from "crypto";
 
-import {CloseCode, create_pairing_code_server, send_pairing_result, Session} from "@pi-tray/secure-channel";
+import {
+    CloseCode,
+    create_pairing_code_server,
+    PAIRING_CODE_LIFETIME_MS,
+    send_pairing_result,
+    Session
+} from "@pi-tray/secure-channel";
 import type {PairedDeviceInfo, PairingState, PairingSubmitResult} from "@pi-tray/types";
 
 import {online_device_keys, send_to_editors, WireMessage} from "./clients";
@@ -129,9 +135,16 @@ export const pair_unknown_device = async (session: Session<WireMessage>, login_p
     const decision = await new Promise<PairingDecision>((resolve) => {
         // removed as soon as it's decided, so state sent after that doesn't list it as still waiting
         const decide = (decision: PairingDecision) => {
+            clearTimeout(expiry);
             pending.delete(session);
             resolve(decision);
         };
+
+        // the pi drops its code after PAIRING_CODE_LIFETIME_MS, so anything still waiting past that isn't a real pi
+        const expiry = setTimeout(() => {
+            decide({kind: "left"});
+            session.disconnect(1000, "pairing code expired");
+        }, PAIRING_CODE_LIFETIME_MS);
 
         pending.set(session, {public_key: peer_public_key, code, decide});
         broadcast_pairing_state();
