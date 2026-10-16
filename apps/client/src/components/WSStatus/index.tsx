@@ -1,6 +1,6 @@
 import {ChannelStatus, useChannelStatus} from "../../contexts/WSContext";
 
-import {CircleAlert, Lock, Unplug} from "lucide-react";
+import {CircleAlert, Lock, ShieldLock, Unplug} from "lucide-react";
 
 import styles from "./component.module.css";
 
@@ -19,6 +19,16 @@ const status_map: Record<ChannelStatus, StatusMapEntry> = {
     encrypting: {
         message: "Encrypting...",
         icon: <Lock className={styles.icon} />,
+        className: styles.connecting
+    },
+    authenticating: {
+        message: "Authenticating...",
+        icon: <ShieldLock className={styles.icon} />,
+        className: styles.connecting
+    },
+    pairing: {
+        message: "Pairing required.",
+        icon: <ShieldLock className={styles.icon} />,
         className: styles.connecting
     },
     ready: {

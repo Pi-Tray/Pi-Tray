@@ -2,6 +2,7 @@ import {WSProvider} from "./contexts/WSContext";
 import {WSStatus} from "./components/WSStatus";
 
 import {WSPushButtonGrid} from "./components/PushButtonGrid";
+import {PairingUI} from "./components/PairingUI";
 
 import "./style/App.css";
 
@@ -12,6 +13,7 @@ export default function App() {
     return (
         <WSProvider url={ws_url}>
             <WSStatus />
+            <PairingUI />
 
             <WSPushButtonGrid className="grid" />
         </WSProvider>

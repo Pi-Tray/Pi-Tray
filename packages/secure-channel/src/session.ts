@@ -19,6 +19,9 @@ export class Session<AppData = unknown> {
     readonly #send_key: CryptoKey;
     readonly #receive_key: CryptoKey;
     readonly #transport: Transport;
+
+    readonly handshake_hash: ArrayBuffer;
+
     #send_counter = 0;
     #receive_counter = 0;
 
@@ -28,10 +31,11 @@ export class Session<AppData = unknown> {
     // the transport only holds one waiting receiver, so overlapping receives would lose messages
     #receiving = false;
 
-    constructor(send_key: CryptoKey, receive_key: CryptoKey, transport: Transport) {
+    constructor(send_key: CryptoKey, receive_key: CryptoKey, transport: Transport, handshake_hash: ArrayBuffer) {
         this.#send_key = send_key;
         this.#receive_key = receive_key;
         this.#transport = transport;
+        this.handshake_hash = handshake_hash;
     }
 
     send<MessageData = unknown>(message: SecureMessage<MessageData>): Promise<void> {
@@ -98,8 +102,11 @@ export class Session<AppData = unknown> {
         await this.send({type: "verification", payload});
     }
 
-    async receive_verification_data(): Promise<VerificationPayload> {
-        const message = await this.receive<VerificationPayload>();
+    /**
+     * @param timeout_ms how long to wait, or forever if not given (e.g. while the user types a pairing code)
+     */
+    async receive_verification_data(timeout_ms?: number): Promise<VerificationPayload> {
+        const message = await this.receive<VerificationPayload>(timeout_ms);
         if (message.type !== "verification") {
             throw new Error("expected a verification message");
         }
@@ -120,7 +127,7 @@ export const start_client_session = async <T>(transport: Transport): Promise<Ses
         const hash = await transcript_hash(client_hello_text, server_hello_text);
         const {send_key, receive_key} = await derive_session_keys(secret, hash, "client");
 
-        const session = new Session<T>(send_key, receive_key, transport);
+        const session = new Session<T>(send_key, receive_key, transport, hash);
         await session.expect_finished(hash);
         await session.send_finished(hash);
         return session;
@@ -143,7 +150,7 @@ export const start_server_session = async <T>(transport: Transport): Promise<Ses
         const hash = await transcript_hash(client_hello_text, server_hello_text);
         const {send_key, receive_key} = await derive_session_keys(secret, hash, "server");
 
-        const session = new Session<T>(send_key, receive_key, transport);
+        const session = new Session<T>(send_key, receive_key, transport, hash);
         await session.send_finished(hash);
         await session.expect_finished(hash);
         return session;

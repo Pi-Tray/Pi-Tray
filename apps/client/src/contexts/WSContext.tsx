@@ -1,7 +1,14 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {CellCoordinates, ServerMessage} from "@pi-tray/types";
-import {Session, start_client_session} from "@pi-tray/secure-channel";
+import {
+    await_pairing_result,
+    create_pairing_code_client,
+    log_in_client,
+    Session,
+    start_client_session
+} from "@pi-tray/secure-channel";
 import {BrowserWebSocketTransport} from "../util/BrowserWebSocketTransport.ts";
+import {load_identity, save_trusted_server} from "../util/identity.ts";
 
 /**
  * A message the client sends to the server. The channel encrypts and frames it, so components
@@ -16,12 +23,8 @@ export type ClientMessage =
 // what crosses the channel in either direction, before we narrow it to a known message
 type WireMessage = {action: string, payload?: unknown};
 
-/**
- * The channel's lifecycle as components care about it: connecting (socket opening), encrypting
- * (socket open, running the secure handshake), ready (handshake confirmed, safe to send), or
- * closed (waiting to reconnect).
- */
-export type ChannelStatus = "connecting" | "encrypting" | "ready" | "closed";
+
+export type ChannelStatus = "connecting" | "encrypting" | "authenticating" | "pairing" | "ready" | "closed";
 
 export interface Channel {
     status: ChannelStatus;
@@ -34,6 +37,8 @@ export interface Channel {
 
     /** Registers a handler for every server message. Returns an unsubscribe function. */
     subscribe: (handler: (message: ServerMessage) => void) => () => void;
+
+    pairing_code: string | null;
 }
 
 const ChannelContext = createContext<Channel | null>(null);
@@ -65,6 +70,8 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
     const reconnect_attempts = useRef(0);
     const backoff_timeout = useRef<number | null>(null);
     const force_closed = useRef(false);
+
+    const [pairing_code, setPairingCode] = useState<string | null>(null);
 
     // stable across renders: components capture these once
     const send = useCallback((message: ClientMessage) => {
@@ -131,6 +138,8 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
             // construct the transport synchronously so it is listening before the server's hello arrives
             const transport = new BrowserWebSocketTransport(ws);
 
+            await load_identity();
+
             try {
                 const active_session = await start_client_session<WireMessage>(transport);
                 session.current = active_session;
@@ -140,6 +149,30 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
                 if (backoff_timeout.current) {
                     clearTimeout(backoff_timeout.current);
                     backoff_timeout.current = null;
+                }
+
+                setStatus("authenticating");
+                let login = await log_in_client(active_session);
+
+                if (login === "unknown_device") {
+                    setStatus("pairing");
+                    const {code, peer_public_key} = await create_pairing_code_client(active_session);
+                    setPairingCode(code);
+
+                    // no timeout, wait for the user to type the code into the editor
+                    if (!await await_pairing_result(active_session)) {
+                        throw new Error("Pairing rejected");
+                    }
+
+                    await save_trusted_server(peer_public_key, url);
+                    setPairingCode(null);
+
+                    // pairing proves the key trust, logging in proves this session, so always log in after pairing
+                    login = await log_in_client(active_session);
+                }
+
+                if (login !== "logged_in") {
+                    throw new Error("Login failed");
                 }
 
                 console.log("Secure channel ready");
@@ -198,7 +231,13 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
     }, [url]);
 
     // stable identity so subscribing/ready effects only re-run when the status (or url) actually changes
-    const channel = useMemo<Channel>(() => ({status, url, send, subscribe}), [status, url, send, subscribe]);
+    const channel = useMemo<Channel>(() => ({
+        status,
+        url,
+        send,
+        subscribe,
+        pairing_code
+    }), [status, url, send, subscribe, pairing_code]);
 
     return <ChannelContext.Provider value={channel}>{children}</ChannelContext.Provider>;
 };
@@ -243,4 +282,12 @@ export const useChannelReady = (callback: () => void) => {
             callback();
         }
     }, [status, callback]);
+};
+
+export const usePairingCode = (): string | null => {
+    const status = useChannelStatus();
+    if (status !== "pairing") {
+        return null;
+    }
+    return useChannel()?.pairing_code ?? null;
 };
