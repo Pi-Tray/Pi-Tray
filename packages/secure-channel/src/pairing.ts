@@ -19,8 +19,8 @@ const derive_pairing_code = async (props: {
     const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(concatenated));
 
     const first_4_bytes_uint = new DataView(hash).getUint32(0, false);
-    const unpadded_code = first_4_bytes_uint % 1000000;
-    return unpadded_code.toString().padStart(6, "0");
+    const unpadded_code = first_4_bytes_uint % 100000000;
+    return unpadded_code.toString().padStart(8, "0");
 }
 
 /**
