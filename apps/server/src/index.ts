@@ -5,14 +5,16 @@ import minimist from "minimist";
 
 import {createServer} from "http";
 
-import type { MessageData, MessageHandler } from "./types";
+import type { MessageHandler } from "./types";
 
 // ensure data init scripts run
 import {write_ws_url_for_editor} from "./data";
 
 import {register_notifiers} from "./notifiers";
 
-import {connected_clients} from "./clients";
+import {Client, connected_clients, WireMessage} from "./clients";
+import {NodeWebSocketTransport} from "./transport";
+import {start_server_session} from "@pi-tray/secure-channel";
 import {handle_asset_request} from "./assets";
 import {live_client_connected, live_client_disconnected} from "./live/runner";
 import {apply_arg_overrides, SERVER_CONFIG_FILE} from "@pi-tray/server-config";
@@ -44,71 +46,67 @@ console.log(`Starting WebSocket server on ws://${host}:${port}`);
 const http_server = createServer(handle_asset_request);
 const ws_server = new WebSocketServer({ server: http_server });
 
-ws_server.on("connection", ws => {
-    console.log("Client connected");
+// decrypts in order from one client, dispatching each message to its handler
+const dispatch = async (client: Client, data: WireMessage) => {
+    if (typeof data?.action !== "string") {
+        console.warn("Ignoring a message with no action");
+        return;
+    }
 
-    connected_clients.add(ws);
+    const handler = handlers[data.action];
+    if (!handler) {
+        console.warn(`No handler for action "${data.action}"`);
+        client.send({action: "invalid", payload: {for: data}});
+        return;
+    }
+
+    try {
+        await handler(client, data.payload);
+    } catch (error) {
+        console.error(`Error handling action "${data.action}":`, error);
+        client.send({action: "error", payload: {for: data}});
+    }
+}
+
+ws_server.on("connection", async ws => {
+    console.log("Client connected, starting secure handshake");
 
     ws.on("error", (error) => {
         console.warn("Client socket error:", error.message);
     });
 
-    const unregister_notifiers = register_notifiers(ws);
+    let session;
+    try {
+        session = await start_server_session<WireMessage>(new NodeWebSocketTransport(ws));
+    } catch (error) {
+        console.warn("Handshake failed, dropping connection:", error instanceof Error ? error.message : error);
+        return;
+    }
+
+    const client = new Client(session);
+    connected_clients.add(client);
+
+    const unregister_notifiers = register_notifiers(client);
     live_client_connected();
 
     ws.on("close", () => {
-        connected_clients.delete(ws);
+        connected_clients.delete(client);
         unregister_notifiers();
         live_client_disconnected();
     });
 
-    ws.on("message", async (message) => {
-        const decoded = message.toString();
-        console.log(`Received message: ${decoded}`);
-
-        let data: MessageData;
-        try {
-            data = JSON.parse(decoded);
-        } catch {
-            console.warn("Ignoring a message that isn't valid JSON");
-            return;
-        }
-
-        // find the handler for the action
-        const handler = handlers[data.action];
-        if (handler) {
-            try {
-                // call the handler with the payload
-                await handler(ws, data.payload);
-            } catch (error) {
-                console.error(`Error handling action "${data.action}":`, error);
-
-                ws.send(JSON.stringify({
-                    action: "error",
-                    payload: {
-                        for: data
-                    }
-                }));
-            }
-        } else {
-            console.warn(`No handler for action "${data.action}"`);
-
-            ws.send(JSON.stringify({
-                action: "invalid",
-                payload: {
-                    for: data
-                }
-            }));
-        }
-    });
-
     // welcome message
-    ws.send(JSON.stringify({
-        action: "hello",
-        payload: {
-            motd: "Served fresh!"
+    client.send({action: "hello", payload: {motd: "Served fresh!"}});
+
+    // pull decrypted messages until the channel closes or a frame fails to authenticate
+    try {
+        for (;;) {
+            await dispatch(client, await session.receive());
         }
-    }));
+    } catch (error) {
+        console.log("Client channel closed:", error instanceof Error ? error.message : error);
+        ws.close();
+    }
 });
 
 const is_allowed_address = create_address_filter(config.allowed_networks);

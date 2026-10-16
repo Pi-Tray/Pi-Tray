@@ -1,7 +1,7 @@
 import type {MessageHandler} from "../types";
 
-export default ((ws, payload) => {
-    ws.send(JSON.stringify({
+export default ((client, payload) => {
+    client.send({
         action: "pong",
-    }));
+    });
 }) as MessageHandler;

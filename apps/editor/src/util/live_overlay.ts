@@ -1,9 +1,9 @@
-import {useEffect, useRef, useSyncExternalStore} from "react";
+import {useCallback, useEffect, useRef, useSyncExternalStore} from "react";
 
-import type {CellData, PluginLiveControllable} from "@pi-tray/types";
-import {ASSET_PATH_PATTERN, parse_server_message} from "@pi-tray/types";
+import type {CellData, PluginLiveControllable, ServerMessage} from "@pi-tray/types";
+import {ASSET_PATH_PATTERN} from "@pi-tray/types";
 
-import {useWebSocket} from "../contexts/WSProvider";
+import {useChannel, useChannelMessage, useChannelReady, useChannelStatus} from "../contexts/WSProvider";
 
 /**
  * What the server last sent for a cell, with the background turned back into an asset id
@@ -34,10 +34,8 @@ const asset_id_from_url = (url: string | null): string | null => {
     return url.split("?")[0].match(ASSET_PATH_PATTERN)?.[1] ?? null;
 }
 
-const handle_message = (event: MessageEvent) => {
-    const message = parse_server_message(event.data);
-
-    if (message?.action !== "set_cells" || !Array.isArray(message.payload)) {
+const handle_message = (message: ServerMessage) => {
+    if (message.action !== "set_cells" || !Array.isArray(message.payload)) {
         return;
     }
 
@@ -87,34 +85,24 @@ const subscribe = (listener: () => void) => {
  * Everything is cleared when the connection changes or closes, so stale values are never shown.
  */
 export const useLiveOverlayConnection = () => {
-    const ws = useWebSocket();
+    const channel = useChannel();
+    const status = useChannelStatus();
 
+    useChannelMessage(handle_message);
+
+    // the server only sends cells when they change, so ask for everything to fill the overlay straight away
+    const request_all = useCallback(() => channel?.send({action: "all_buttons"}), [channel]);
+    useChannelReady(request_all);
+
+    // never show stale values once the connection drops or changes
     useEffect(() => {
-        clear_all_live_cells();
-
-        if (!ws) {
-            return;
-        }
-
-        ws.addEventListener("message", handle_message);
-        ws.addEventListener("close", clear_all_live_cells);
-
-        // the server only sends cells when they change, so ask for everything to fill the overlay straight away
-        const request_all = () => ws.send(JSON.stringify({action: "all_buttons"}));
-
-        if (ws.readyState === WebSocket.OPEN) {
-            request_all();
-        } else {
-            ws.addEventListener("open", request_all, {once: true});
-        }
-
-        return () => {
-            ws.removeEventListener("message", handle_message);
-            ws.removeEventListener("close", clear_all_live_cells);
-            ws.removeEventListener("open", request_all);
+        if (status !== "ready") {
             clear_all_live_cells();
-        };
-    }, [ws]);
+        }
+    }, [status]);
+
+    // forget everything when the hook unmounts
+    useEffect(() => clear_all_live_cells, []);
 }
 
 /**

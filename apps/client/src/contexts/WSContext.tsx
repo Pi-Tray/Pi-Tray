@@ -1,7 +1,42 @@
-import {createContext, useCallback, useContext, useEffect, useRef, useState} from "react";
-import {parse_server_message} from "@pi-tray/types";
+import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
+import {CellCoordinates, ServerMessage} from "@pi-tray/types";
+import {Session, start_client_session} from "@pi-tray/secure-channel";
+import {BrowserWebSocketTransport} from "../util/BrowserWebSocketTransport.ts";
 
-const WSContext = createContext<WebSocket | null>(null);
+/**
+ * A message the client sends to the server. The channel encrypts and frames it, so components
+ * pass the object rather than a JSON string.
+ * TODO: this should prob be exhuastivley defined in core types so editor, client, server agree
+ */
+export type ClientMessage =
+    | {action: "push", payload: CellCoordinates}
+    | {action: "all_buttons"}
+    | {action: "size"};
+
+// what crosses the channel in either direction, before we narrow it to a known message
+type WireMessage = {action: string, payload?: unknown};
+
+/**
+ * The channel's lifecycle as components care about it: connecting (socket opening), encrypting
+ * (socket open, running the secure handshake), ready (handshake confirmed, safe to send), or
+ * closed (waiting to reconnect).
+ */
+export type ChannelStatus = "connecting" | "encrypting" | "ready" | "closed";
+
+export interface Channel {
+    status: ChannelStatus;
+
+    /** The url the channel connected to, e.g. ws://192.168.50.1:8080, for resolving server asset paths. */
+    url: string;
+
+    /** Encrypts and sends a message. Drops it (with a log) if the channel isn't ready yet. */
+    send: (message: ClientMessage) => void;
+
+    /** Registers a handler for every server message. Returns an unsubscribe function. */
+    subscribe: (handler: (message: ServerMessage) => void) => () => void;
+}
+
+const ChannelContext = createContext<Channel | null>(null);
 
 interface WSProviderProps {
     url: string;
@@ -13,25 +48,71 @@ const DEFAULT_MAX_BACKOFF_MS = 30_000; // 30 seconds
 const CONNECT_TIMEOUT_MS = 5_000; // give up on a connection attempt after 5 seconds
 
 /**
- * WebSocket provider that manages a WebSocket connection and handles reconnections with exponential backoff.
+ * Provider that keeps a secure channel to the server open, reconnecting with exponential backoff.<br>
+ * It owns the single reader on the session and fans decrypted messages out to subscribers, so
+ * components never touch the socket or the session directly.
  * @param url WebSocket URL to connect to
- * @param children children components that will have access to the WebSocket context
+ * @param children children components that will have access to the channel context
  * @param max_backoff_ms maximum backoff time in milliseconds for reconnections (default: 30 seconds)
  * @constructor
  */
-export const WSProvider = ({ url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_MS }: WSProviderProps) => {
-    const [socket, setSocket] = useState<WebSocket | null>(null);
+export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_MS}: WSProviderProps) => {
+    const [status, setStatus] = useState<ChannelStatus>("connecting");
+
+    const session = useRef<Session<WireMessage> | null>(null);
+    const subscribers = useRef<Set<(message: ServerMessage) => void>>(new Set());
 
     const reconnect_attempts = useRef(0);
     const backoff_timeout = useRef<number | null>(null);
-
     const force_closed = useRef(false);
 
-    // sets up a connection with event listeners to reconnect with exponential backoff
-    const connect = useCallback(() => {
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            return; // already connected
+    // stable across renders: components capture these once
+    const send = useCallback((message: ClientMessage) => {
+        if (!session.current) {
+            console.error("Channel is not ready, dropping message", message);
+            return;
         }
+
+        session.current.send(message).catch((error) => console.error("Failed to send message", error));
+    }, []);
+
+    const subscribe = useCallback((handler: (message: ServerMessage) => void) => {
+        subscribers.current.add(handler);
+        return () => {
+            subscribers.current.delete(handler);
+        };
+    }, []);
+
+    // the single reader: decrypt messages in order and hand each to every subscriber
+    const read_loop = useCallback(async (active_session: Session<WireMessage>, ws: WebSocket) => {
+        try {
+            for (;;) {
+                const message = await active_session.receive();
+
+                // everything here comes from the (authenticated) server, but a frame could still be malformed
+                if (typeof message?.action !== "string") {
+                    continue;
+                }
+                const server_message = message as ServerMessage;
+
+                // the provider owns reload; it would restart every component otherwise
+                if (server_message.action === "reload") {
+                    location.reload();
+                    return;
+                }
+
+                subscribers.current.forEach((handler) => handler(server_message));
+            }
+        } catch (error) {
+            // closed by either side, or a frame failed to decrypt: drop the socket so onclose reconnects
+            console.log("Channel reader stopped", error);
+            ws.close();
+        }
+    }, []);
+
+    // sets up a connection, runs the handshake, then reads until it closes, reconnecting with backoff
+    const connect = useCallback(() => {
+        setStatus("connecting");
 
         const ws = new WebSocket(url);
 
@@ -42,15 +123,32 @@ export const WSProvider = ({ url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF
             }
         }, CONNECT_TIMEOUT_MS);
 
-        ws.onopen = () => {
+        ws.onopen = async () => {
             clearTimeout(connect_timeout);
-            console.log("WebSocket connection established");
+            console.log("WebSocket connection established, starting handshake");
+            setStatus("encrypting");
 
-            // reset backoff on successful connection
-            reconnect_attempts.current = 0;
-            if (backoff_timeout.current) {
-                clearTimeout(backoff_timeout.current);
-                backoff_timeout.current = null;
+            // construct the transport synchronously so it is listening before the server's hello arrives
+            const transport = new BrowserWebSocketTransport(ws);
+
+            try {
+                const active_session = await start_client_session<WireMessage>(transport);
+                session.current = active_session;
+
+                // reset backoff only once the channel is actually confirmed, not just when the socket opened
+                reconnect_attempts.current = 0;
+                if (backoff_timeout.current) {
+                    clearTimeout(backoff_timeout.current);
+                    backoff_timeout.current = null;
+                }
+
+                console.log("Secure channel ready");
+                setStatus("ready");
+
+                void read_loop(active_session, ws);
+            } catch (error) {
+                // start_client_session already called disconnect(); onclose will schedule the reconnect
+                console.error("Secure handshake failed", error);
             }
         };
 
@@ -58,9 +156,11 @@ export const WSProvider = ({ url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF
             clearTimeout(connect_timeout);
             console.log("WebSocket connection closed", event);
 
+            session.current = null;
+            setStatus("closed");
+
             if (!force_closed.current) {
                 // attempt to reconnect with exponential backoff
-
                 reconnect_attempts.current += 1;
 
                 // cap the exponential timeout at max_backoff_ms
@@ -78,30 +178,18 @@ export const WSProvider = ({ url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF
         ws.onerror = (error) => {
             console.error("WebSocket error", error);
         };
+    }, [url, max_backoff_ms, read_loop]);
 
-        // handle reload messages
-        ws.addEventListener("message", (event) => {
-            const data = parse_server_message(event.data);
-            if (data?.action === "reload") {
-                location.reload();
-            }
-        });
-
-        setSocket(ws);
-    }, [url, socket]);
-
-    // effect to create ws connection and clean it up on unmount (or if the url changes)
+    // create the connection and clean it up on unmount (or if the url changes)
     useEffect(() => {
         force_closed.current = false;
         connect();
 
         return () => {
-            // mark as closed to prevent reconnection
+            // mark as closed to prevent reconnection, then drop the current session's socket
             force_closed.current = true;
-
-            if (socket) {
-                socket.close();
-            }
+            session.current?.disconnect();
+            session.current = null;
 
             if (backoff_timeout.current) {
                 clearTimeout(backoff_timeout.current);
@@ -109,59 +197,50 @@ export const WSProvider = ({ url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF
         };
     }, [url]);
 
-    return <WSContext.Provider value={socket}>{children}</WSContext.Provider>;
+    // stable identity so subscribing/ready effects only re-run when the status (or url) actually changes
+    const channel = useMemo<Channel>(() => ({status, url, send, subscribe}), [status, url, send, subscribe]);
+
+    return <ChannelContext.Provider value={channel}>{children}</ChannelContext.Provider>;
 };
 
 /**
- * Shorthand hook to access the WebSocket context.<br>
- * This hook should be used within a component that is a child of the {@link WSProvider}.
+ * Access the channel. Returns null outside a {@link WSProvider}.
  */
-export const useWebSocket = () => {
-    return useContext(WSContext);
+export const useChannel = () => {
+    return useContext(ChannelContext);
 };
 
 /**
- * Hook to listen for changes in the WebSocket ready state.<br>
- * This hook will call the provided callback function whenever the ready state changes (open, close, or error).<br>
- * It also calls the callback immediately with the current ready state when the hook is first used.<br>
- * This hook should be used within a component that is a child of the {@link WSProvider}.
- * @param callback function to call with the new ready state
+ * The current channel status, re-rendering when it changes.
  */
-export const useWebSocketReadyStateChange = (callback: (readyState: WebSocket["readyState"]) => void) => {
-    const ws = useWebSocket();
+export const useChannelStatus = (): ChannelStatus => {
+    return useChannel()?.status ?? "closed";
+};
+
+/**
+ * Subscribe to server messages for as long as the component is mounted.
+ * @param handler called with each message from the server
+ */
+export const useChannelMessage = (handler: (message: ServerMessage) => void) => {
+    const channel = useChannel();
 
     useEffect(() => {
-        if (!ws) return;
-
-        const on_change = () => {
-            callback(ws.readyState);
-        };
-
-        ws.addEventListener("open", on_change);
-        ws.addEventListener("close", on_change);
-        ws.addEventListener("error", on_change);
-
-        // initial call
-        on_change();
-
-        return () => {
-            ws.removeEventListener("open", on_change);
-            ws.removeEventListener("close", on_change);
-            ws.removeEventListener("error", on_change);
-        };
-    }, [ws]);
-}
+        if (!channel) return;
+        return channel.subscribe(handler);
+    }, [channel, handler]);
+};
 
 /**
- * Hook to get the current WebSocket ready state and update when it changes.<br>
- * This hook should be used within a component that is a child of the {@link WSProvider}.
- * @returns the current WebSocket ready state
+ * Runs the callback whenever the channel becomes ready, including immediately if it already is.<br>
+ * Use it to (re)send anything the server needs on each fresh connection, e.g. requesting grid state.
+ * @param callback called each time the channel reaches the ready state
  */
-export const useWebSocketReadyState = () => {
-    const ws = useWebSocket();
-    const [ready_state, setReadyState] = useState<WebSocket["readyState"]>(ws ? ws.readyState : WebSocket.CLOSED);
+export const useChannelReady = (callback: () => void) => {
+    const status = useChannelStatus();
 
-    useWebSocketReadyStateChange(setReadyState);
-
-    return ready_state;
-}
+    useEffect(() => {
+        if (status === "ready") {
+            callback();
+        }
+    }, [status, callback]);
+};

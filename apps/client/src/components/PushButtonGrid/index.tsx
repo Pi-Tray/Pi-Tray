@@ -3,8 +3,8 @@ import {PushButton} from "../PushButton";
 import {CSSProperties, useCallback, useEffect, useRef, useState} from "react";
 
 import styles from "./component.module.css";
-import {useWebSocket, useWebSocketReadyStateChange} from "../../contexts/WSContext.tsx";
-import {parse_server_message} from "@pi-tray/types";
+import {useChannel, useChannelMessage, useChannelReady} from "../../contexts/WSContext.tsx";
+import {ServerMessage} from "@pi-tray/types";
 
 interface BasePushButtonGridProps {
     className?: string;
@@ -30,37 +30,23 @@ export const PushButtonGrid = ({ rows, cols, className, button_className, reques
     const gridWrapperRef = useRef<HTMLDivElement>(null);
     const [gridStyle, setGridStyle] = useState<CSSProperties>({});
 
-    const ws = useWebSocket();
+    const channel = useChannel();
 
-    // its a bit hacky to do here rather than somewhere else and theres probably a better way, but it works
-    // usually just sending all the data as soon as the socket connects is fine, but im worried about race conditions
-    // note that this callback is always bound but doesnt trigger unless request_all_buttons is true
-    // this avoids any instances of the hook order changing if the prop changes
     const request_all = useCallback(
-        (state: WebSocket["readyState"]) => {
-            console.log("Requesting all buttons from server...");
-            if (request_all_buttons && ws && state === WebSocket.OPEN) {
+        () => {
+            if (request_all_buttons && channel?.status === "ready") {
                 console.log("Requesting all buttons from server");
-                ws.send(JSON.stringify({ action: "all_buttons"}));
+                channel.send({action: "all_buttons"});
             }
         },
-        [ws, request_all_buttons]
+        [channel, request_all_buttons]
     );
 
-    // if size changes, request all buttons again
-    // could do it smarter but this works reliably, just a bit wasteful
-    // TODO: fix this requesting twice
-    // TODO: this is in dire need of a refactor! or we could just tell the server to send all buttons when the grid size changes with a flag
+    // request when the channel becomes ready, and again if the grid size changes
+    useChannelReady(request_all);
     useEffect(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            request_all(ws.readyState);
-        }
-    }, [ws, rows, cols, request_all]);
-
-    // bind request to websocket ready state change
-    // TODO: this is a race condition
-    // TODO: this causes 4 requests to fire at first launch!
-    useWebSocketReadyStateChange(request_all);
+        request_all();
+    }, [rows, cols, request_all]);
 
     // TODO: fix gemini's terrible code
     // i had to do this, grid was pissing me off and this way works
@@ -149,48 +135,31 @@ export const WSPushButtonGrid = ({ className, button_className }: BasePushButton
     const [rows, setRows] = useState<number | null>(null);
     const [cols, setCols] = useState<number | null>(null);
 
-    const ws = useWebSocket();
+    const channel = useChannel();
 
     // load grid size from server
     const handle_message = useCallback(
-        (event: MessageEvent) => {
-            const data = parse_server_message(event.data);
-
-            if (data?.action === "size") {
+        (data: ServerMessage) => {
+            if (data.action === "size") {
                 console.log("Received grid size:", data.payload);
 
                 setRows(data.payload.rows);
                 setCols(data.payload.cols);
             }
         },
-        [ws]
+        []
     );
+    useChannelMessage(handle_message);
 
+    // when the channel becomes ready, request the grid size
     const request_size = useCallback(
-        (state: WebSocket["readyState"]) => {
-            if (ws && state === WebSocket.OPEN) {
-                console.log("Requesting grid size from server");
-                ws.send(JSON.stringify({action: "size"}));
-            }
+        () => {
+            console.log("Requesting grid size from server");
+            channel?.send({action: "size"});
         },
-        [ws]
+        [channel]
     );
-
-    // bind message handling
-    useEffect(() => {
-        if (ws) {
-            ws.addEventListener("message", handle_message);
-        }
-
-        return () => {
-            if (ws) {
-                ws.removeEventListener("message", handle_message);
-            }
-        };
-    }, [ws, handle_message]);
-
-    // when websocket becomes ready, request the grid size
-    useWebSocketReadyStateChange(request_size);
+    useChannelReady(request_size);
 
     if (rows === null || cols === null) {
         return <div className={className}>Loading...</div>;

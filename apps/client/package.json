@@ -12,6 +12,7 @@
     "dependencies": {
         "@pi-tray/ui": "workspace:*",
         "@pi-tray/types": "workspace:*",
+        "@pi-tray/secure-channel": "workspace:*",
         "lucide-react": "^1.49.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",

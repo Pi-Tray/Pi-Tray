@@ -1,16 +1,16 @@
-import {useWebSocket} from "../../contexts/WSProvider";
+import {useChannel} from "../../contexts/WSProvider";
 import {useCallback} from "react";
 import {Link} from "wouter";
 import {ArrowLeft} from "lucide-react";
 
 export const DevToolsPluginsPage = () => {
-    const ws = useWebSocket();
+    const channel = useChannel();
 
     const reload_all_plugins = useCallback(
         () => {
-            ws?.send(JSON.stringify({action: "reload_plugins"}));
+            channel?.send({action: "reload_plugins"});
         },
-        [ws]
+        [channel]
     );
 
     return (

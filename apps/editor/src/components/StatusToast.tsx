@@ -1,29 +1,30 @@
-import {useState} from "react";
-import {useWebSocket, useWebSocketReadyStateChange} from "../contexts/WSProvider";
+import {useEffect, useState} from "react";
+import {ChannelStatus, useChannel, useChannelStatus} from "../contexts/WSProvider";
 
 import {motion} from "motion/react";
 
 export const StatusToast = () => {
     // shows the latest "stable" status
-    // i.e. it only shows connecting the first time it's trying to connect, and then shows open/closed until the next update
-    // this is because exponential backoff is used for reconnecting, which will make the ws alternate between connecting and closed states,
+    // i.e. it only shows connecting the first time it's trying to connect, and then shows ready/closed until the next update
+    // this is because exponential backoff is used for reconnecting, which will make the channel alternate between connecting and closed states,
     // which is not very useful to show in the ui
 
-    const ws = useWebSocket();
-    const [displayed_status, setDisplayedStatus] = useState<WebSocket["readyState"]>(WebSocket.CONNECTING);
+    const channel = useChannel();
+    const status = useChannelStatus();
 
-    useWebSocketReadyStateChange((new_status: WebSocket["readyState"]) => {
-        if (new_status === WebSocket.OPEN || new_status === WebSocket.CLOSED) {
-            setDisplayedStatus(new_status);
+    const [displayed_status, setDisplayedStatus] = useState<ChannelStatus>("connecting");
+    useEffect(() => {
+        if (status === "ready" || status === "closed") {
+            setDisplayedStatus(status);
         }
-    });
+    }, [status]);
 
     let text;
     let status_class;
     let show_pinger;
 
-    if (ws === null) {
-        // null ws indicates no url was provided or the provider isn't in the dom
+    if (channel === null) {
+        // null channel indicates no url was provided or the provider isn't in the dom
         // so the user hasn't configured the server address yet
 
         text = "Configure server address!";
@@ -31,18 +32,16 @@ export const StatusToast = () => {
         show_pinger = false;
     } else {
         switch (displayed_status) {
-            case WebSocket.OPEN:
+            case "ready":
                 text = "Running";
                 status_class = "status-success";
                 show_pinger = false;
                 break;
-            case WebSocket.CLOSED:
-            case WebSocket.CLOSING:
+            case "closed":
                 text = "Stopped";
                 status_class = "status-error";
                 show_pinger = true;
                 break;
-            case WebSocket.CONNECTING:
             default:
                 text = "Connecting...";
                 status_class = "status-neutral";

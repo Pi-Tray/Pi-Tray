@@ -1,12 +1,12 @@
-import {useWebSocket} from "../../contexts/WSContext.tsx";
-import {useEffect, useState, useCallback} from "react";
+import {useChannel, useChannelMessage} from "../../contexts/WSContext.tsx";
+import {useState, useCallback} from "react";
 
 import {AutoTextScale} from "@pi-tray/ui/AutoTextScale";
 
 import {DynamicIcon} from "lucide-react/dynamic";
 
 import styles from "./component.module.css";
-import {parse_server_message} from "@pi-tray/types";
+import {ServerMessage} from "@pi-tray/types";
 
 /**
  * Resolves an asset path from the server (e.g. `/assets/<id>.png?v=123`) against the server's address.<br>
@@ -55,7 +55,7 @@ export const PushButton = ({x, y, style, className}: PushButtonProps) => {
 
     const [result_class, setResultClass] = useState("");
 
-    const ws = useWebSocket();
+    const channel = useChannel();
 
     // log function that includes button coordinates, acts just like console.log
     const button_log = useCallback(
@@ -80,24 +80,19 @@ export const PushButton = ({x, y, style, className}: PushButtonProps) => {
                 return;
             }
 
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
-                    action: "push",
-                    payload: {x, y}
-                }));
+            if (channel && channel.status === "ready") {
+                channel.send({action: "push", payload: {x, y}});
             } else {
-                button_error("WebSocket is not open");
+                button_error("Channel is not ready");
             }
         },
-        [ws, x, y, pushable]
+        [channel, x, y, pushable, button_error]
     );
 
     // handle various messages from the server
     const handle_message = useCallback(
-        (event: MessageEvent) => {
-            const data = parse_server_message(event.data);
-
-            switch (data?.action) {
+        (data: ServerMessage) => {
+            switch (data.action) {
                 case "push_ok":
                     if (data.payload.x === x && data.payload.y === y) {
                         button_log("Server acknowledged push.");
@@ -127,25 +122,18 @@ export const PushButton = ({x, y, style, className}: PushButtonProps) => {
                         button_log("Server set cell:", cell.text, "is icon:", cell.is_icon, "background:", cell.background);
                         setText(cell.text);
                         setTextIsIcon(cell.is_icon || false);
-                        setBackgroundURL(resolve_asset_url(cell.background, (event.target as WebSocket).url));
+                        setBackgroundURL(resolve_asset_url(cell.background, channel?.url ?? ""));
                         setPushable(cell.pushable ?? true);
                     }
                     break;
                 }
             }
         },
-        [x, y, button_log]
+        [x, y, button_log, button_error, channel?.url]
     );
 
-    // bind the message handler to the websocket
-    useEffect(() => {
-        if (ws) {
-            ws.addEventListener("message", handle_message);
-            return () => {
-                ws.removeEventListener("message", handle_message);
-            };
-        }
-    }, [ws]);
+    // react to server messages for as long as the button is mounted
+    useChannelMessage(handle_message);
 
     let content: React.ReactNode = null;
 

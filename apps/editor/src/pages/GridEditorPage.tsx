@@ -5,7 +5,7 @@ import {unwrap_plugin_reference, usePluginInfo} from "../util/plugins";
 import {PushButtonGrid} from "../components/PushButtonGrid";
 
 import {Activity, ImageIcon, MousePointerClick, Plus, Settings, Trash, X} from "lucide-react";
-import {useWebSocket} from "../contexts/WSProvider.tsx";
+import {useChannel} from "../contexts/WSProvider.tsx";
 import {ConfigEditDialog} from "../components/ConfigEditDialog.tsx";
 import {IconPickerDialog} from "../components/IconPicker.tsx";
 import {CustomDynamicIcon} from "../components/CustomDynamicIcon.tsx";
@@ -202,7 +202,7 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
         }
     }, [cell]);
 
-    const ws = useWebSocket();
+    const channel = useChannel();
     const simulate_button_push = useCallback(
         () => {
             if (!cell) {
@@ -214,19 +214,19 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
                 return;
             }
 
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({
+            if (channel && channel.status === "ready") {
+                channel.send({
                     action: "push",
                     payload: {
                         x: coords.x,
                         y: coords.y
                     }
-                }));
+                });
             } else {
-                alert("WebSocket is not open.");
+                alert("Not connected to the server.");
             }
         },
-        [cell, plugin, ws, coords]
+        [cell, plugin, channel, coords]
     );
 
     const delete_button = useCallback(

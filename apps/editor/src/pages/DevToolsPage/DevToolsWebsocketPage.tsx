@@ -1,10 +1,12 @@
-import {useState, useCallback, useEffect} from "react";
-import {useWebSocket} from "../../contexts/WSProvider";
+import {useState, useCallback} from "react";
+import {useChannel, useChannelMessage, useChannelStatus} from "../../contexts/WSProvider";
+import {ServerMessage} from "@pi-tray/types";
 import {AlertCircle, ArrowLeft} from "lucide-react";
 import {Link} from "wouter";
 
 export const DevToolsWebsocketPage = () => {
-    const ws = useWebSocket();
+    const channel = useChannel();
+    const status = useChannelStatus();
 
     const [replies, setReplies] = useState<string>("");
 
@@ -15,12 +17,13 @@ export const DevToolsWebsocketPage = () => {
 
     const send_message = useCallback(
         () => {
-            if (ws && ws.readyState === WebSocket.OPEN) {
+            if (channel && status === "ready") {
                 const message = send_area_value.trim();
 
                 // validate json
+                let parsed;
                 try {
-                    JSON.parse(message);
+                    parsed = JSON.parse(message);
                 } catch (e) {
                     setSendAreaClass("textarea-error");
 
@@ -31,35 +34,24 @@ export const DevToolsWebsocketPage = () => {
                 }
 
                 if (message) {
-                    ws.send(message);
+                    channel.send(parsed);
                     setSendAreaClass("textarea-success");
                 }
             } else {
-                console.warn("WebSocket is not open");
+                console.warn("Channel is not ready");
             }
         },
-        [ws, send_area_value]
+        [channel, status, send_area_value]
     );
 
+    // the channel decrypts messages into objects, so show them as formatted json
     const on_message = useCallback(
-        (event: MessageEvent) => {
-            const message = event.data;
-            setReplies(prev => `${message}\n${prev}`);
+        (message: ServerMessage) => {
+            setReplies(prev => `${JSON.stringify(message)}\n${prev}`);
         },
         [setReplies]
     );
-
-    // add message listener to the websocket
-    useEffect(() => {
-        if (ws) {
-            ws.addEventListener("message", on_message);
-
-            // cleanup listener on unmount
-            return () => {
-                ws.removeEventListener("message", on_message);
-            };
-        }
-    }, [ws, on_message]);
+    useChannelMessage(on_message);
 
     const area_change = useCallback(
         (event: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -77,7 +69,7 @@ export const DevToolsWebsocketPage = () => {
         [setSendAreaValue, setSendAreaClass]
     );
 
-    const allow_interaction = ws && ws.readyState === WebSocket.OPEN;
+    const allow_interaction = channel !== null && status === "ready";
 
     return (
         <div className="h-full w-full flex flex-col">

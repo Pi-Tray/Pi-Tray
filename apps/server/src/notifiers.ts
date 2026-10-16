@@ -1,4 +1,4 @@
-import type {WebSocket} from "ws";
+import type {Client} from "./clients";
 
 import type {CellPayload, ServerMessage} from "./types";
 import {add_grid_change_listener, get_loaded_grid, get_shape_of_loaded_grid, GridChangeListener, remove_grid_change_listener} from "./data";
@@ -14,31 +14,29 @@ interface CellNotifier {
     unregister: () => void;
 }
 
-const notifiers = new WeakMap<WebSocket, CellNotifier>();
+const notifiers = new WeakMap<Client, CellNotifier>();
 
 const cell_key = (row_idx: number, col_idx: number) => `${row_idx},${col_idx}`;
 
-const send_message = (ws: WebSocket, message: ServerMessage) => {
-    if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify(message));
-    }
+const send_message = (client: Client, message: ServerMessage) => {
+    client.send(message);
 }
 
 /**
  * Sends every filled cell to the client in one set_cells, e.g. when it first loads or its grid size changes.
- * @param ws the client's socket
+ * @param client the client
  */
-export const send_full_grid = (ws: WebSocket) => {
-    notifiers.get(ws)?.send_full_grid();
+export const send_full_grid = (client: Client) => {
+    notifiers.get(client)?.send_full_grid();
 }
 
 /**
  * Starts sending the client every change to the grid, its assets and live plugin values.<br>
  * Changed cells are batched into one set_cells, and cells that look the same as what the client already has are skipped.
- * @param ws the client's socket
- * @returns a function that stops the notifications, call it when the socket closes
+ * @param client the client
+ * @returns a function that stops the notifications, call it when the connection closes
  */
-export const register_notifiers = (ws: WebSocket): (() => void) => {
+export const register_notifiers = (client: Client): (() => void) => {
     // what the client was last sent for each cell, as JSON, so unchanged cells aren't sent again
     let last_sent = new Map<string, string>();
 
@@ -67,7 +65,7 @@ export const register_notifiers = (ws: WebSocket): (() => void) => {
         pending_cells.clear();
 
         if (payloads.length > 0) {
-            send_message(ws, {action: "set_cells", payload: payloads});
+            send_message(client, {action: "set_cells", payload: payloads});
         }
     }
 
@@ -91,14 +89,14 @@ export const register_notifiers = (ws: WebSocket): (() => void) => {
             last_sent.set(cell_key(payload.y, payload.x), JSON.stringify(payload));
         }
 
-        send_message(ws, {action: "set_cells", payload: payloads});
+        send_message(client, {action: "set_cells", payload: payloads});
     }
 
     const grid_changed: GridChangeListener = async (changes) => {
         for (const change of changes) {
             if (change === "shape") {
                 // the client rebuilds its grid and asks for every cell again, so no need to send cells here
-                send_message(ws, {action: "size", payload: get_shape_of_loaded_grid()});
+                send_message(client, {action: "size", payload: get_shape_of_loaded_grid()});
                 continue;
             }
 
@@ -133,11 +131,11 @@ export const register_notifiers = (ws: WebSocket): (() => void) => {
             clearTimeout(flush_timer);
         }
 
-        notifiers.delete(ws);
+        notifiers.delete(client);
     };
 
-    notifiers.set(ws, {send_full_grid: notifier_send_full_grid, unregister});
+    notifiers.set(client, {send_full_grid: notifier_send_full_grid, unregister});
 
-    // call when the socket closes, otherwise the listeners live forever and keep sending to a dead socket
+    // call when the connection closes, otherwise the listeners live forever and keep sending to a dead client
     return unregister;
 }

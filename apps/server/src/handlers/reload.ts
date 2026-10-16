@@ -1,14 +1,10 @@
-import WebSocket from "ws";
-
 import type {MessageHandler} from "../types";
 import {connected_clients} from "../clients";
 
-export default (async (ws, payload) => {
-    for (const client of connected_clients) {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({
-                action: "reload"
-            }));
+export default (async (client, payload) => {
+    for (const other of connected_clients) {
+        if (other !== client) {
+            other.send({action: "reload"});
         }
     }
 }) as MessageHandler;

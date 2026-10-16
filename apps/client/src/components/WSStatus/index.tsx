@@ -1,6 +1,6 @@
-import {useWebSocketReadyState} from "../../contexts/WSContext";
+import {ChannelStatus, useChannelStatus} from "../../contexts/WSContext";
 
-import {CircleAlert, Unplug} from "lucide-react";
+import {CircleAlert, Lock, Unplug} from "lucide-react";
 
 import styles from "./component.module.css";
 
@@ -10,22 +10,22 @@ interface StatusMapEntry {
     className: string;
 }
 
-const status_map: { [key: WebSocket["readyState"]]: StatusMapEntry } = {
-    [WebSocket.CONNECTING]: {
+const status_map: Record<ChannelStatus, StatusMapEntry> = {
+    connecting: {
         message: "Connecting...",
         icon: <Unplug className={styles.icon} />,
         className: styles.connecting
     },
-    [WebSocket.OPEN]: {
+    encrypting: {
+        message: "Encrypting...",
+        icon: <Lock className={styles.icon} />,
+        className: styles.connecting
+    },
+    ready: {
         message: "Connected.",
         className: "hidden"
     },
-    [WebSocket.CLOSING]: {
-        message: "Connection closing...",
-        icon: <CircleAlert className={styles.icon} />,
-        className: styles.close
-    },
-    [WebSocket.CLOSED]: {
+    closed: {
         message: "Waiting to reconnect...",
         icon: <CircleAlert className={styles.icon} />,
         className: styles.closed
@@ -37,13 +37,12 @@ interface WSStatusProps {
 }
 
 /**
- * Component that displays the current WebSocket connection status.
+ * Component that displays the current channel connection status.
  * @param className additional class names to apply
  * @constructor
  */
 export const WSStatus = ({className}: WSStatusProps) => {
-    const ready_state = useWebSocketReadyState();
-    const status = status_map[ready_state];
+    const status = status_map[useChannelStatus()];
 
     return (
         <div className={`${styles.element} ${status.className} ${className || ""}`}>
