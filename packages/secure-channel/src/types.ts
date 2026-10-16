@@ -1,3 +1,9 @@
+import {
+    CommitmentInitiatorNonceRevealPayload,
+    CommitmentInitPayload,
+    CommitmentResponderNoncePayload
+} from "./commitments";
+
 // sent by both parties
 export interface HelloMessage {
     public_key: string;
@@ -18,7 +24,7 @@ export type VerificationPayload =
     | CommitmentInitiatorNonceRevealPayload
     | VerificationLoginPayload;
 
-export type SecureMessage<T = unknown> =
+export type SecureMessage<AppData = unknown> =
     | {type: "finished", handshake_hash: string}
     | {type: "verification", payload: VerificationPayload}
-    | {type: "app", payload: T};
+    | {type: "app", payload: AppData};

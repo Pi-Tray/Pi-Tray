@@ -73,7 +73,7 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
             return;
         }
 
-        session.current.send(message).catch((error) => console.error("Failed to send message", error));
+        session.current.send_app_data(message).catch((error) => console.error("Failed to send message", error));
     }, []);
 
     const subscribe = useCallback((handler: (message: ServerMessage) => void) => {
@@ -87,7 +87,7 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
     const read_loop = useCallback(async (active_session: Session<WireMessage>, ws: WebSocket) => {
         try {
             for (;;) {
-                const message = await active_session.receive();
+                const message = await active_session.receive_app_data();
 
                 // everything here comes from the (authenticated) server, but a frame could still be malformed
                 if (typeof message?.action !== "string") {

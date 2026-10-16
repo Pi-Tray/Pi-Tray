@@ -1,6 +1,6 @@
 import {create_hello, create_keypair, derive_session_keys, derive_shared_secret, parse_hello} from "./hellos";
 import {receive_text, Transport} from "./transport";
-import {SecureMessage} from "./types";
+import {SecureMessage, VerificationPayload} from "./types";
 import {bytes_to_base64} from "./util";
 
 // a peer that connects and goes quiet shouldn't hold the handshake open forever
@@ -15,12 +15,18 @@ const iv_for = (counter: number): Uint8Array<ArrayBuffer> => {
     return iv;
 }
 
-export class Session<T> {
+export class Session<AppData = unknown> {
     readonly #send_key: CryptoKey;
     readonly #receive_key: CryptoKey;
     readonly #transport: Transport;
     #send_counter = 0;
     #receive_counter = 0;
+
+    // sends run one at a time, so ciphertexts go out in counter order even when encryptions finish out of order
+    #send_queue: Promise<void> = Promise.resolve();
+
+    // the transport only holds one waiting receiver, so overlapping receives would lose messages
+    #receiving = false;
 
     constructor(send_key: CryptoKey, receive_key: CryptoKey, transport: Transport) {
         this.#send_key = send_key;
@@ -28,46 +34,74 @@ export class Session<T> {
         this.#transport = transport;
     }
 
-    async #send_secure(message: SecureMessage): Promise<void> {
-        const iv = iv_for(this.#send_counter++);
-        const plaintext = new TextEncoder().encode(JSON.stringify(message));
-        const ciphertext = await crypto.subtle.encrypt({name: "AES-GCM", iv}, this.#send_key, plaintext);
-        this.#transport.send(new Uint8Array(ciphertext));
+    send<MessageData = unknown>(message: SecureMessage<MessageData>): Promise<void> {
+        const sending = this.#send_queue.then(async () => {
+            const iv = iv_for(this.#send_counter++);
+            const plaintext = new TextEncoder().encode(JSON.stringify(message));
+            const ciphertext = await crypto.subtle.encrypt({name: "AES-GCM", iv}, this.#send_key, plaintext);
+            this.#transport.send(new Uint8Array(ciphertext));
+        });
+
+        // a failed send shouldn't block the ones after it, the error still reaches this caller
+        this.#send_queue = sending.catch(() => {});
+        return sending;
     }
 
-    async #receive_secure<T = unknown>(timeout_ms?: number): Promise<SecureMessage<T>> {
-        const data = await this.#transport.receive(timeout_ms);
-        if (typeof data === "string") {
-            throw new Error("expected an encrypted binary frame");
+    async receive<MessageData = unknown>(timeout_ms?: number): Promise<SecureMessage<MessageData>> {
+        if (this.#receiving) {
+            throw new Error("receive() is already waiting, receive messages one at a time");
         }
-        const iv = iv_for(this.#receive_counter++);
-        const plaintext = await crypto.subtle.decrypt({name: "AES-GCM", iv}, this.#receive_key, data);
-        return JSON.parse(new TextDecoder().decode(plaintext));
+
+        this.#receiving = true;
+
+        try {
+            const data = await this.#transport.receive(timeout_ms);
+            if (typeof data === "string") {
+                throw new Error("expected an encrypted binary frame");
+            }
+            const iv = iv_for(this.#receive_counter++);
+            const plaintext = await crypto.subtle.decrypt({name: "AES-GCM", iv}, this.#receive_key, data);
+            return JSON.parse(new TextDecoder().decode(plaintext));
+        } finally {
+            this.#receiving = false;
+        }
     }
+
+    disconnect(code = 1000, reason = "session closed"): void {
+        this.#transport.disconnect(code, reason);
+    }
+
     async send_finished(hash: ArrayBuffer): Promise<void> {
-        await this.#send_secure({type: "finished", handshake_hash: bytes_to_base64(new Uint8Array(hash))});
+        await this.send({type: "finished", handshake_hash: bytes_to_base64(new Uint8Array(hash))});
     }
 
     async expect_finished(hash: ArrayBuffer): Promise<void> {
-        const message = await this.#receive_secure(HANDSHAKE_TIMEOUT_MS);
+        const message = await this.receive(HANDSHAKE_TIMEOUT_MS);
         if (message.type !== "finished" || message.handshake_hash !== bytes_to_base64(new Uint8Array(hash))) {
             throw new Error("handshake not confirmed by peer");
         }
     }
 
-    /** Drops the underlying connection, e.g. when the channel can no longer be trusted or is shutting down. */
-    disconnect(code = 1000, reason = "session closed"): void {
-        this.#transport.disconnect(code, reason);
+    async send_app_data(payload: AppData): Promise<void> {
+        await this.send({type: "app", payload});
     }
 
-    send(data: T): Promise<void> {
-        return this.#send_secure({type: "app", payload: data});
-    }
-
-    async receive(): Promise<T> {
-        const message = await this.#receive_secure<T>();
+    async receive_app_data(): Promise<AppData> {
+        const message = await this.receive<AppData>();
         if (message.type !== "app") {
             throw new Error("expected an application message");
+        }
+        return message.payload;
+    }
+
+    async send_verification_data(payload: VerificationPayload): Promise<void> {
+        await this.send({type: "verification", payload});
+    }
+
+    async receive_verification_data(): Promise<VerificationPayload> {
+        const message = await this.receive<VerificationPayload>();
+        if (message.type !== "verification") {
+            throw new Error("expected a verification message");
         }
         return message.payload;
     }

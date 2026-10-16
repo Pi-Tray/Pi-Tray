@@ -10,7 +10,7 @@ export class Client {
     constructor(private readonly session: Session<WireMessage>) {}
 
     send(message: WireMessage): void {
-        this.session.send(message).catch((error) => console.warn("Failed to send to client:", error));
+        this.session.send_app_data(message).catch((error) => console.warn("Failed to send to client:", error));
     }
 
     disconnect(code = 1000, reason = "server closing"): void {

@@ -1,4 +1,4 @@
-import {bytes_to_base64, sha256_str} from "./util";
+import {base64_to_bytes, bytes_to_base64, sha256_str} from "./util";
 
 // a commitment stops either party choosing its nonce after seeing the other's:
 // - the initiator sends a hash of its nonce first, the responder sends its nonce, then the initiator reveals its own
@@ -10,7 +10,7 @@ export type CommitableData = {
 
 // typically sent by client to initiate commitment (which is used for pin code pairing)
 export interface CommitmentInitPayload {
-    kind: "commitment";
+    kind: "commitment_init";
     hashed_nonce: string;
 
     data: CommitableData;
@@ -18,7 +18,7 @@ export interface CommitmentInitPayload {
 
 // typically sent by server to respond to commitment
 export interface CommitmentResponderNoncePayload {
-    kind: "commitment_nonce";
+    kind: "commitment_responder_nonce";
     nonce: string;
 
     data: CommitableData;
@@ -26,8 +26,26 @@ export interface CommitmentResponderNoncePayload {
 
 // and then the first party reveals the nonce
 export interface CommitmentInitiatorNonceRevealPayload {
-    kind: "commitment_nonce_reveal";
+    kind: "commitment_initiator_nonce_reveal";
     nonce: string;
+}
+
+const NONCE_BYTES = 32;
+
+const create_nonce = (): string => bytes_to_base64(crypto.getRandomValues(new Uint8Array(NONCE_BYTES)));
+
+// validate that a nonce is valid base64 and the correct length
+const assert_valid_nonce = (nonce: string) => {
+    let nonce_bytes: Uint8Array;
+    try {
+        nonce_bytes = base64_to_bytes(nonce);
+    } catch {
+        throw new Error("Peer nonce isn't valid base64");
+    }
+
+    if (nonce_bytes.length !== NONCE_BYTES) {
+        throw new Error(`Peer nonce should be ${NONCE_BYTES} bytes, got ${nonce_bytes.length}`);
+    }
 }
 
 // using prop arg to avoid ambiguity. the order of concatenation MUST match
@@ -36,17 +54,22 @@ const join_nonces = (nonces: {
     responder: string;
 }): string => nonces.initiator + nonces.responder;
 
+export interface ExtractedCommitment {
+    nonce: string;
+    peer_data: CommitableData;
+}
+
 export class CommitmentInitiator {
     readonly #nonce: string;
     #responder_nonce_payload?: CommitmentResponderNoncePayload;
 
     constructor() {
-        this.#nonce = bytes_to_base64(crypto.getRandomValues(new Uint8Array(32)));
+        this.#nonce = create_nonce();
     }
 
-    async get_commitment_payload(data?: CommitableData): Promise<CommitmentInitPayload> {
+    async get_commitment_init_payload(data?: CommitableData): Promise<CommitmentInitPayload> {
         return {
-            kind: "commitment",
+            kind: "commitment_init",
             hashed_nonce: bytes_to_base64(new Uint8Array(await sha256_str(this.#nonce))),
             data: data || {}
         };
@@ -57,6 +80,7 @@ export class CommitmentInitiator {
             throw new Error("Responder nonce payload already set");
         }
 
+        assert_valid_nonce(responder_nonce_payload.nonce);
         this.#responder_nonce_payload = responder_nonce_payload;
     }
 
@@ -66,12 +90,12 @@ export class CommitmentInitiator {
         }
 
         return {
-            kind: "commitment_nonce_reveal",
+            kind: "commitment_initiator_nonce_reveal",
             nonce: this.#nonce
         };
     }
 
-    extract(): {nonce: string, peer_data: CommitableData} {
+    extract(): ExtractedCommitment {
         if (!this.#responder_nonce_payload) {
             throw new Error("Peer nonce payload not set");
         }
@@ -93,18 +117,18 @@ export class CommitmentResponder {
     #has_nonce_been_returned = false;
 
     constructor(initiator_commitment: CommitmentInitPayload) {
-        this.#nonce = bytes_to_base64(crypto.getRandomValues(new Uint8Array(32)));
+        this.#nonce = create_nonce();
         this.#initiator_commitment = initiator_commitment;
     }
 
-    get_commitment_nonce_payload(data?: CommitableData): CommitmentResponderNoncePayload {
+    get_commitment_responder_nonce_payload(data?: CommitableData): CommitmentResponderNoncePayload {
         if (this.#has_nonce_been_returned) {
             console.warn("Commitment nonce payload already returned, returning again");
         }
         this.#has_nonce_been_returned = true;
 
         return {
-            kind: "commitment_nonce",
+            kind: "commitment_responder_nonce",
             nonce: this.#nonce,
             data: data || {}
         };
@@ -120,7 +144,9 @@ export class CommitmentResponder {
         return expected_hash === actual_hash;
     }
 
-    async extract(initiator_nonce_reveal: CommitmentInitiatorNonceRevealPayload): Promise<{nonce: string, peer_data: CommitableData}> {
+    async extract(initiator_nonce_reveal: CommitmentInitiatorNonceRevealPayload): Promise<ExtractedCommitment> {
+        assert_valid_nonce(initiator_nonce_reveal.nonce);
+
         const is_valid = await this.check_initiator_nonce_reveal(initiator_nonce_reveal);
         if (!is_valid) {
             throw new Error("Peer nonce reveal does not match commitment!");
