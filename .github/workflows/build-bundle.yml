@@ -1,0 +1,195 @@
+name: Build editor, server, and supervisor bundles
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "bundle-v*"
+    # changes to any of the apps or packages that are included in the bundle should trigger a rebuild to sanity check
+    branches:
+      - main
+    paths:
+      - "apps/editor/**"
+      - "apps/server/**"
+      - "apps/supervisor/**"
+      - "packages/types/**"
+      - "packages/secure-channel/**"
+      - "packages/paths/**"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/build-bundle.yml"
+
+permissions:
+  contents: write
+
+# Auto-cancels active runs on the same branch when a new commit is pushed.
+# Tag pushes (releases) are isolated by their specific tag name so they don't cancel each other.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      should_publish: ${{ steps.determine.outputs.should_publish }}
+      release_tag: ${{ steps.determine.outputs.release_tag }}
+    steps:
+      - id: determine
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "should_publish=true" >> "$GITHUB_OUTPUT"
+            echo "release_tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            echo "release_tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-tauri:
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest" # for Arm based macs (M1 and above).
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest" # for Intel based macs.
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+          - platform: "windows-latest" # TODO: set up cross compilation to produce nsis on ubuntu
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - name: Cache apt packages
+        if: matrix.platform == 'ubuntu-22.04'
+        uses: awalsh128/cache-apt-pkgs-action@v1.5.1
+        with:
+          packages: libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          version: 1.0
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            apps/editor/src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('apps/editor/src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install system dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        id: tauri-build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/editor
+          tauriScript: pnpm tauri
+          args: ${{ matrix.args }}
+
+      - name: Prepare artifact paths
+        id: prep_paths
+        shell: bash
+        run: |
+          echo "paths<<EOF" >> "$GITHUB_OUTPUT"
+          echo '${{ steps.tauri-build.outputs.artifactPaths }}' | jq -r .[] >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      # Always upload files to a temporary workflow-run bridge so they can be collected later.
+      # If publishing, these temporary artifacts are set to expire in 1 single day to stay clear of your 500MB quota.
+      - name: Upload build artifacts
+        id: upload_step
+        uses: actions/upload-artifact@v4
+        with:
+          name: tauri-binaries-${{ matrix.platform }}-${{ matrix.args || 'default' }}
+          path: ${{ steps.prep_paths.outputs.paths }}
+          retention-days: ${{ needs.check.outputs.should_publish == 'true' && 1 || 2 }}
+
+      # Clean up older historical testing artifacts for this matrix block if this is a standard commit run
+      - name: Prune older platform artifacts
+        if: always() && needs.check.outputs.should_publish == 'false' && steps.upload_step.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          PREFIX="tauri-binaries-${{ matrix.platform }}-${{ matrix.args || 'default' }}"
+          CURRENT_ID="${{ steps.upload_step.outputs.artifact-id }}"
+          gh api repos/${{ github.repository }}/actions/artifacts --paginate \
+            --jq ".artifacts[] | select(.name == \"$PREFIX\") | select(.id != $CURRENT_ID) | .id" | \
+            while read -r old_id; do
+              if [ -n "$old_id" ]; then
+                gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$old_id" || true
+              fi
+            done
+
+  publish:
+    needs: [check, build-tauri]
+    if: needs.check.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create local download directory
+        run: mkdir dist-bins
+
+      # Downloads all compiled binaries produced across your different cross-compilation runners
+      - name: Download all compiled matrix binaries
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tauri-binaries-*
+          path: dist-bins
+          merge-multiple: true
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_tag="${{ needs.check.outputs.release_tag }}"
+          
+          if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            gh release upload "$release_tag" dist-bins/* --repo "${{ github.repository }}" --clobber
+          else
+            gh release create "$release_tag" dist-bins/* --repo "${{ github.repository }}" --title "$release_tag" --generate-notes --latest=false
+          fi
+
+      - name: Update the rolling editor-latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view editor-latest --repo "${{ github.repository }}" > /dev/null 2>&1; then
+            gh release create editor-latest --repo "${{ github.repository }}" --title "Latest Editor App Assets" \
+              --notes "Rolling release reflecting the absolute newest stable compilation of the editor desktop binary applications." \
+              --latest=false
+          fi
+          gh release upload editor-latest dist-bins/* --repo "${{ github.repository }}" --clobber

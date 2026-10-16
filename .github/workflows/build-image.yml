@@ -8,7 +8,7 @@ on:
     branches:
       - main
     paths:
-      #- "apps/client/**" dont rebuild every client change or quota is swallowed! manually tag image releases when a new client is ready to be included
+      #- "apps/client/**" dont rebuild every client change or storage and mins quota is swallowed! manually tag image releases when a new client is ready to be included
       # if image build scripts change, rebuild the image to check it still works
       - "apps/image/**"
       - ".github/workflows/build-image.yml"
