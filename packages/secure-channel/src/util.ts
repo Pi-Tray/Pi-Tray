@@ -15,3 +15,8 @@ export const bytes_to_base64 = (bytes: Uint8Array): string => {
     }
     return btoa(binary_string);
 }
+
+export const sha256_str = async (text: string): Promise<ArrayBuffer> => {
+    const data = new TextEncoder().encode(text);
+    return await crypto.subtle.digest("SHA-256", data);
+}
