@@ -10,7 +10,6 @@ export const PairingUI = () => {
         return null;
     }
 
-    // TODO: style
     // TODO: show time remaining as a progress bar
     return (
         <div className={styles.element}>
