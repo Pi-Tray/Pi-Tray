@@ -15,6 +15,12 @@ export const AutostartPrompt = () => {
         }
         is_first_mount.current = false;
 
+        // never offer autostart from a dev build: enabling it would point the Run key / launch agent at the
+        // throwaway target/debug sidecar, which then runs at login and locks the exe against the next build
+        if (import.meta.env.DEV) {
+            return;
+        }
+
         (async () => {
             if (await get_config("autostart_prompted")) {
                 // already asked, don't show again
@@ -58,6 +64,12 @@ export const AutostartPrompt = () => {
 
     const enable_autostart = useCallback(
         async () => {
+            // guard again in case this is ever reached in a dev build: see the mount effect above
+            if (import.meta.env.DEV) {
+                console.warn("Skipping autostart enable in a dev build");
+                return;
+            }
+
             const command = Command.sidecar("binaries/pi-tray-service", ["autostart", "enable"]);
             const output = await command.execute();
             if (output.code === 0) {
