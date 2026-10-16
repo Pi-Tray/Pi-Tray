@@ -57,7 +57,7 @@ export const LeftNav = () => {
     return (
       <ul className="menu h-full bg-base-300">
           <LeftNavItem href="/" title="Grid Editor" icon={<LayoutGrid />} />
-          <LeftNavItem href="/device" title="Device" icon={<Tablet />} />
+          <LeftNavItem href="/devices" title="Devices" icon={<Tablet />} mark_if_nested={true} />
           <LeftNavItem href="/plugins" title="Plugin Manager" icon={<ToyBrick />} />
           <LeftNavItem href="/assets" title="Asset Manager" icon={<Images />} />
 

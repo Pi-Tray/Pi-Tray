@@ -161,6 +161,10 @@ export const WSPushButtonGrid = ({ className, button_className }: BasePushButton
     );
     useChannelReady(request_size);
 
+    if (!channel || channel.status === "pairing") {
+        return null;
+    }
+
     if (rows === null || cols === null) {
         return <div className={className}>Loading...</div>;
     }

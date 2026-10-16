@@ -25,6 +25,11 @@ const derive_pairing_code = async (props: {
     return unpadded_code.toString().padStart(PAIRING_CODE_LENGTH, "0");
 }
 
+export const format_code = (code: string) => {
+    // format code as 4 groups of 4 characters
+    return code.match(/.{1,4}/g)?.join("-") || code;
+}
+
 /**
  * Checks our key pair wasn't replaced while pairing, otherwise the code would vouch for a key we no longer hold.
  * @param pubkey_at_start our public key from when pairing began
