@@ -29,13 +29,13 @@
         "@pi-tray/server-config": "workspace:*",
         "@pi-tray/secure-channel": "workspace:*",
         "@types/ws": "^8.18.1",
-        "minimist": "^1.2.8",
+        "minimist": "catalog:",
         "ws": "^8.18.3"
     },
     "devDependencies": {
-        "@types/minimist": "^1.2.5",
-        "tsx": "^4.20.3",
-        "typescript": "^5.9.2"
+        "@types/minimist": "catalog:",
+        "tsx": "catalog:",
+        "typescript": "catalog:"
     },
     "private": true
 }

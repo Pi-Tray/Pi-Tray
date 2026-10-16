@@ -13,21 +13,21 @@
         "@pi-tray/ui": "workspace:*",
         "@pi-tray/types": "workspace:*",
         "@pi-tray/secure-channel": "workspace:*",
-        "lucide-react": "^1.49.0",
-        "react": "^19.1.0",
-        "react-dom": "^19.1.0",
+        "lucide-react": "catalog:",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
         "vite-tsconfig-paths": "^5.1.4"
     },
     "devDependencies": {
         "@eslint/js": "^9.30.1",
-        "@types/react": "^19.1.9",
-        "@types/react-dom": "^19.1.7",
-        "@vitejs/plugin-react": "^4.6.0",
+        "@types/react": "catalog:react19",
+        "@types/react-dom": "catalog:react19",
+        "@vitejs/plugin-react": "catalog:",
         "eslint": "^9.30.1",
         "eslint-plugin-react-hooks": "^5.2.0",
         "eslint-plugin-react-refresh": "^0.4.20",
         "globals": "^16.3.0",
-        "typescript": "^5.9.2",
+        "typescript": "catalog:",
         "vite": "^7.0.4"
     }
 }

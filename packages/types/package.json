@@ -14,7 +14,7 @@
         "build:dist": "tsc -p tsconfig.json && tsc -p tsconfig.esm.json && node -e \"require('fs').writeFileSync('dist/esm/package.json', JSON.stringify({type: 'module'}))\""
     },
     "devDependencies": {
-        "typescript": "^5.6.0"
+        "typescript": "catalog:"
     },
     "publishConfig": {
         "main": "./dist/cjs/index.js",

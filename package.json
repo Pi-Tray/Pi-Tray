@@ -9,7 +9,7 @@
     },
     "devDependencies": {
         "@yao-pkg/pkg": "^6.23.0",
-        "minimist": "^1.2.8",
+        "minimist": "catalog:",
         "pe-library": "^1.0.1",
         "resedit": "^2.0.3"
     },

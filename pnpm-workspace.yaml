@@ -2,6 +2,30 @@ packages:
   - "apps/*"
   - "packages/*"
 
+# shared dependency versions, one source of truth. reference as "catalog:" (default)
+# or "catalog:<name>" in a package.json instead of a literal range.
+catalog:
+  "typescript": ^5.9.2
+  "@types/node": ^24.2.1
+  "tsx": ^4.20.3
+  "minimist": ^1.2.8
+  "@types/minimist": ^1.2.5
+  "lucide-react": ^1.49.0
+  "@vitejs/plugin-react": ^4.6.0
+
+# react is split on purpose: the editor is on 18, the client on 19 (see the wouter note below).
+catalogs:
+  react18:
+    "react": ^18.3.1
+    "react-dom": ^18.3.1
+    "@types/react": ^18.3.1
+    "@types/react-dom": ^18.3.1
+  react19:
+    "react": ^19.1.0
+    "react-dom": ^19.1.0
+    "@types/react": ^19.1.9
+    "@types/react-dom": ^19.1.7
+
 # esbuild (used by vite and tsx) needs its install script to fetch its binary
 onlyBuiltDependencies:
   - esbuild

@@ -13,12 +13,12 @@
     },
     "dependencies": {
         "@pi-tray/paths": "workspace:*",
-        "minimist": "^1.2.8"
+        "minimist": "catalog:"
     },
     "devDependencies": {
-        "@types/minimist": "^1.2.5",
-        "@types/node": "^24.2.1",
-        "typescript": "^5.9.2",
-        "tsx": "^4.20.3"
+        "@types/minimist": "catalog:",
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "tsx": "catalog:"
     }
 }

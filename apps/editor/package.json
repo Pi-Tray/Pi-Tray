@@ -26,11 +26,11 @@
         "@tauri-apps/plugin-shell": "^2.3.6",
         "daisyui": "^5.0.50",
         "json-edit-react": "^1.28.2",
-        "lucide-react": "^1.49.0",
+        "lucide-react": "catalog:",
         "lucide-static": "^1.49.0",
         "motion": "^12.23.12",
-        "react": "^18.3.1",
-        "react-dom": "^18.3.1",
+        "react": "catalog:react19",
+        "react-dom": "catalog:react19",
         "react-markdown": "^10.1.0",
         "remark-gfm": "^4.0.1",
         "tailwindcss": "^4.1.11",
@@ -38,10 +38,10 @@
     },
     "devDependencies": {
         "@tauri-apps/cli": "^2",
-        "@types/react": "^18.3.1",
-        "@types/react-dom": "^18.3.1",
-        "@vitejs/plugin-react": "^4.3.4",
-        "typescript": "~5.6.2",
+        "@types/react": "catalog:react19",
+        "@types/react-dom": "catalog:react19",
+        "@vitejs/plugin-react": "catalog:",
+        "typescript": "catalog:",
         "vite": "^6.0.3"
     }
 }
