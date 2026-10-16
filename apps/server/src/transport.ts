@@ -26,6 +26,9 @@ export class NodeWebSocketTransport extends Transport {
     }
 
     disconnect(code: number, reason: string): void {
+        // ws keeps delivering messages until the peer answers the close frame, so stop listening ourselves
+        this.ws.off("message", this.on_message);
+        this.close(reason);
         this.ws.close(code, reason);
     }
 }
