@@ -56,3 +56,20 @@ export const send_to_editors = (message: WireMessage) => {
         }
     }
 }
+
+/**
+ * Public keys of the paired devices (not editors) with a live connection right now.<br>
+ * This is the source of truth for device liveness, since a client is only in {@link connected_clients}
+ * between logging in and its socket closing.
+ */
+export const online_device_keys = (): Set<string> => {
+    const keys = new Set<string>();
+
+    for (const client of connected_clients) {
+        if (client.identity.role === "device") {
+            keys.add(client.identity.public_key);
+        }
+    }
+
+    return keys;
+}

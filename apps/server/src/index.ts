@@ -17,7 +17,7 @@ import {NodeWebSocketTransport} from "./transport";
 import {CloseCode, handle_login_server, Session, start_server_session} from "@pi-tray/secure-channel";
 import {get_editor_public_key, load_identities} from "./identity";
 import {find_paired_key, touch_paired_device} from "./paired_devices";
-import {get_pairing_state, pair_unknown_device, pairing_connection_closed} from "./pairing";
+import {broadcast_paired_devices, get_pairing_state, pair_unknown_device, pairing_connection_closed} from "./pairing";
 import {handle_asset_request} from "./assets";
 import {live_client_connected, live_client_disconnected} from "./live/runner";
 import {apply_arg_overrides, SERVER_CONFIG_FILE} from "@pi-tray/server-config";
@@ -37,6 +37,11 @@ const EDITOR_ONLY_ACTIONS = new Set([
     "reload",
     "reload_plugins"
 ]);
+
+// how often to ping each client; a client that hasn't ponged by the next tick is assumed dead and dropped,
+// so a device that vanishes ungracefully (power/network loss, half-open socket) stops reading as online
+// within two intervals instead of lingering until the next send to it fails
+const HEARTBEAT_INTERVAL_MS = 30_000;
 
 // TODO: pass custom data directory as argument?
 
@@ -166,10 +171,37 @@ ws_server.on("connection", async ws => {
     const unregister_notifiers = register_notifiers(client);
     live_client_connected();
 
+    // a device just came online, let the editors' devices page reflect it live
+    if (client.identity.role === "device") {
+        broadcast_paired_devices();
+    }
+
+    // terminate a client that misses a heartbeat; ws ping/pong are control frames, so they never reach
+    // the secure channel's message stream
+    let awaiting_pong = false;
+    const heartbeat = setInterval(() => {
+        if (awaiting_pong) {
+            console.warn("Client missed heartbeat, terminating connection");
+            ws.terminate(); // fires "close" below, which runs the same cleanup as a clean disconnect
+            return;
+        }
+
+        awaiting_pong = true;
+        ws.ping();
+    }, HEARTBEAT_INTERVAL_MS);
+    ws.on("pong", () => { awaiting_pong = false; });
+
     ws.on("close", () => {
+        clearInterval(heartbeat);
         connected_clients.delete(client);
         unregister_notifiers();
         live_client_disconnected();
+
+        // record when the device was last online and tell the editors it dropped
+        if (client.identity.role === "device") {
+            touch_paired_device(client.identity.public_key);
+            broadcast_paired_devices();
+        }
     });
 
     // welcome message

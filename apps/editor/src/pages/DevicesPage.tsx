@@ -48,8 +48,14 @@ const PairedDevice = ({device}: {device: PairedDeviceInfo}) => {
     return (
         <div className="card card-border bg-base-100 w-full">
             <div className="card-body flex-row items-center gap-4 p-4">
-                <div className="flex items-center justify-center w-12 h-12 shrink-0 rounded-xl bg-primary/10 text-primary">
-                    <CustomDynamicIcon name="pi-tray" className="w-6 h-6"/>
+                <div className="relative shrink-0">
+                    <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary">
+                        <CustomDynamicIcon name="pi-tray" className="w-6 h-6"/>
+                    </div>
+                    <span
+                        className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-base-100 ${device.online ? "bg-success" : "bg-base-300"}`}
+                        title={device.online ? "Online" : "Offline"}
+                    />
                 </div>
 
                 <div className="flex flex-col gap-1 min-w-0 flex-1">
@@ -65,10 +71,17 @@ const PairedDevice = ({device}: {device: PairedDeviceInfo}) => {
 
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-content/60">
                         <span>Paired {format_date(device.paired_at)}</span>
-                        <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3"/>
-                            {device.last_seen ? `Last seen ${format_date(device.last_seen)} (${last_seen_relative})` : "Never seen"}
-                        </span>
+                        {device.online ? (
+                            <span className="flex items-center gap-1 text-success font-medium">
+                                <span className="w-2 h-2 rounded-full bg-success"/>
+                                Online
+                            </span>
+                        ) : (
+                            <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3"/>
+                                {device.last_seen ? `Last seen ${format_date(device.last_seen)} (${last_seen_relative})` : "Never seen"}
+                            </span>
+                        )}
                     </div>
                 </div>
 

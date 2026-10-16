@@ -5,7 +5,8 @@ import {data_dir, in_data_dir} from "@pi-tray/paths";
 
 const PAIRED_DEVICES_FILE = in_data_dir("paired_devices.json");
 
-type StoredPairedDevice = Omit<PairedDeviceInfo, "public_key">;
+// online is derived from the live connections, not stored, and public_key is the map key
+type StoredPairedDevice = Omit<PairedDeviceInfo, "public_key" | "online">;
 
 // keyed by public key
 let paired_devices = new Map<string, StoredPairedDevice>();
@@ -48,7 +49,9 @@ export const add_paired_device = (public_key: string, name: string) => {
 }
 
 /**
- * Records that a paired device just logged in.
+ * Records that a paired device was just seen, i.e. it logged in or its connection closed.<br>
+ * While a device stays connected its last_seen is its login time; updating it on disconnect means an
+ * offline device reads "last seen" as when it was actually last online.
  */
 export const touch_paired_device = (public_key: string) => {
     const device = paired_devices.get(public_key);
@@ -61,8 +64,12 @@ export const touch_paired_device = (public_key: string) => {
     save_paired_devices();
 }
 
-export const list_paired_devices = (): PairedDeviceInfo[] => {
-    return Array.from(paired_devices, ([public_key, device]) => ({public_key, ...device}));
+export const list_paired_devices = (online_keys: Set<string>): PairedDeviceInfo[] => {
+    return Array.from(paired_devices, ([public_key, device]) => ({
+        public_key,
+        ...device,
+        online: online_keys.has(public_key)
+    }));
 }
 
 /**

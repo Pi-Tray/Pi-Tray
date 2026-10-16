@@ -46,8 +46,11 @@ export interface PairedDeviceInfo {
     /** Unix ms timestamp. */
     paired_at: number;
 
-    /** Unix ms timestamp of the last login, or null if it hasn't logged in since pairing. */
+    /** Unix ms timestamp of when the device was last seen (login or disconnect), or null if it hasn't connected since pairing. */
     last_seen: number | null;
+
+    /** Whether the device has a live connection to the server right now. Derived, not stored. */
+    online: boolean;
 }
 
 export type ServerMessage =

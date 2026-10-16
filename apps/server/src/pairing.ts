@@ -3,7 +3,7 @@ import {timingSafeEqual} from "crypto";
 import {CloseCode, create_pairing_code_server, send_pairing_result, Session} from "@pi-tray/secure-channel";
 import type {PairedDeviceInfo, PairingState, PairingSubmitResult} from "@pi-tray/types";
 
-import {send_to_editors, WireMessage} from "./clients";
+import {online_device_keys, send_to_editors, WireMessage} from "./clients";
 import {add_paired_device, list_paired_devices} from "./paired_devices";
 
 // the device sends its commitment messages straight after hearing it's unknown
@@ -43,7 +43,7 @@ const broadcast_pairing_state = () => {
 }
 
 export const broadcast_paired_devices = () => {
-    send_to_editors({action: "paired_devices", payload: list_paired_devices()});
+    send_to_editors({action: "paired_devices", payload: list_paired_devices(online_device_keys())});
 }
 
 const codes_match = (expected: string, given: string): boolean => {
@@ -154,7 +154,7 @@ export const pair_unknown_device = async (session: Session<WireMessage>, login_p
 
     console.log(`Paired device "${decision.name}"`);
 
-    const paired = list_paired_devices().find((device) => device.public_key === peer_public_key) as PairedDeviceInfo;
+    const paired = list_paired_devices(online_device_keys()).find((device) => device.public_key === peer_public_key) as PairedDeviceInfo;
     send_to_editors({action: "paired", payload: paired});
     broadcast_paired_devices();
 
