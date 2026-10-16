@@ -5,11 +5,11 @@ on:
   push:
     tags:
       - "image-v*"
-    # client or image changes on main build an artifact to check nothing broke, without publishing
     branches:
       - main
     paths:
-      - "apps/client/**"
+      #- "apps/client/**" dont rebuild every client change or quota is swallowed! manually tag image releases when a new client is ready to be included
+      # if image build scripts change, rebuild the image to check it still works
       - "apps/image/**"
       - ".github/workflows/build-image.yml"
   # releases made in GitHub's web UI, so their images are built and attached to them
