@@ -26,7 +26,35 @@ export interface CellCoordinates {
     y: number;
 }
 
+/**
+ * Unknown devices showing a pairing code, sent to the editor whenever it changes.
+ */
+export interface PairingState {
+    pending_public_keys: string[];
+}
+
+/**
+ * The answer to a submit_pairing_code: paired, no waiting device shows that code,
+ * or more than one did so none were paired (they reconnect and show new codes).
+ */
+export type PairingSubmitResult = "paired" | "no_match" | "collided";
+
+export interface PairedDeviceInfo {
+    public_key: string;
+    name: string;
+
+    /** Unix ms timestamp. */
+    paired_at: number;
+
+    /** Unix ms timestamp of the last login, or null if it hasn't logged in since pairing. */
+    last_seen: number | null;
+}
+
 export type ServerMessage =
+    | {action: "pairing_state", payload: PairingState}
+    | {action: "pairing_submit_result", payload: PairingSubmitResult}
+    | {action: "paired", payload: PairedDeviceInfo}
+    | {action: "paired_devices", payload: PairedDeviceInfo[]}
     | {action: "set_cells", payload: CellPayload[]}
     | {action: "size", payload: {rows: number, cols: number}}
     | {action: "push_ok", payload: CellCoordinates}

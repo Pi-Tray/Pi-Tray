@@ -8,6 +8,13 @@ const CLIENT_LOGIN_LABEL = "pi-tray v1 client login";
 // the other side should answer a login straight away
 const LOGIN_TIMEOUT_MS = 5000;
 
+/**
+ * How long a client shows one pairing code before reconnecting for a new one.<br>
+ * Someone in the middle of our connection knows our code and can keep pairing with the server until it gets a match,
+ * so each code only gets this long, alongside the server limiting how often anyone can pair.
+ */
+export const PAIRING_CODE_LIFETIME_MS = 60_000;
+
 const IDENTITY_ALGORITHM = {name: "Ed25519"};
 
 /**
@@ -52,11 +59,19 @@ export const log_in_client = async (session: Session): Promise<ClientLoginResult
 }
 
 /**
- * Waits for the server to say whether the user typed the right pairing code. Doesn't time out, as the user is typing.
+ * Waits for the server to say the user typed our pairing code into the editor.<br>
+ * After {@link PAIRING_CODE_LIFETIME_MS} the code expires: this closes the session and throws, and reconnecting shows a new code.
  * @returns whether pairing succeeded
  */
 export const await_pairing_result = async (session: Session): Promise<boolean> => {
-    const reply = await session.receive_verification_data();
+    let reply;
+
+    try {
+        reply = await session.receive_verification_data(PAIRING_CODE_LIFETIME_MS);
+    } catch (error) {
+        session.disconnect(1000, "pairing code expired");
+        throw error;
+    }
 
     if (reply.kind !== "pairing_result") {
         throw new Error(`Expected a pairing result, got ${reply.kind}`);

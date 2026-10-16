@@ -1,7 +1,8 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {ServerMessage} from "@pi-tray/types";
-import {Session, start_client_session} from "@pi-tray/secure-channel";
+import {log_in_client, Session, start_client_session} from "@pi-tray/secure-channel";
 import {BrowserWebSocketTransport} from "../util/BrowserWebSocketTransport.ts";
+import {load_editor_identity} from "../util/identity.ts";
 
 /**
  * A message the editor sends to the server. The channel encrypts and frames it, so callers pass
@@ -117,6 +118,12 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
 
             try {
                 const active_session = await start_client_session<ClientMessage>(transport);
+
+                await load_editor_identity();
+                if (await log_in_client(active_session) !== "logged_in") {
+                    throw new Error("The server doesn't recognise this editor, restart the server so it recreates editor_identity.json");
+                }
+
                 session.current = active_session;
 
                 // reset backoff only once the channel is actually confirmed, not just when the socket opened
@@ -131,8 +138,9 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
 
                 void read_loop(active_session, ws);
             } catch (error) {
-                // start_client_session already called disconnect(); onclose will schedule the reconnect
-                console.error("Secure handshake failed", error);
+                // close so onclose schedules the reconnect, a no-op if the handshake or server already closed it
+                console.error("Secure handshake or login failed", error);
+                ws.close();
             }
         };
 

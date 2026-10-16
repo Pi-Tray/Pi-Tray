@@ -2,6 +2,7 @@ import {create_hello, create_keypair, derive_session_keys, derive_shared_secret,
 import {receive_text, Transport} from "./transport";
 import {SecureMessage, VerificationPayload} from "./types";
 import {bytes_to_base64} from "./util";
+import {CloseCode} from "./close_codes";
 
 // a peer that connects and goes quiet shouldn't hold the handshake open forever
 const HANDSHAKE_TIMEOUT_MS = 5000;
@@ -132,7 +133,7 @@ export const start_client_session = async <T>(transport: Transport): Promise<Ses
         await session.send_finished(hash);
         return session;
     } catch (error) {
-        transport.disconnect(1002, "handshake failed");
+        transport.disconnect(CloseCode.HANDSHAKE_FAILED, "handshake failed");
         throw error;
     }
 }
@@ -155,7 +156,7 @@ export const start_server_session = async <T>(transport: Transport): Promise<Ses
         await session.expect_finished(hash);
         return session;
     } catch (error) {
-        transport.disconnect(1002, "handshake failed");
+        transport.disconnect(CloseCode.HANDSHAKE_FAILED, "handshake failed");
         throw error;
     }
 }

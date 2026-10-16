@@ -72,10 +72,13 @@ export const create_pairing_code_client = async (session: Session): Promise<Pair
     };
 }
 
-export const create_pairing_code_server = async (session: Session): Promise<PairingResult> => {
+/**
+ * @param timeout_ms how long to wait for each of the client's commitment messages, or forever if not given
+ */
+export const create_pairing_code_server = async (session: Session, timeout_ms?: number): Promise<PairingResult> => {
     const responder_pubkey = await get_loaded_public_key();
 
-    const initiator_payload = await session.receive_verification_data();
+    const initiator_payload = await session.receive_verification_data(timeout_ms);
     if (initiator_payload.kind !== "commitment_init") {
         throw new Error("Expected a commitment_init message");
     }
@@ -86,7 +89,7 @@ export const create_pairing_code_server = async (session: Session): Promise<Pair
         public_key: responder_pubkey
     }));
 
-    const initiator_reveal_payload = await session.receive_verification_data();
+    const initiator_reveal_payload = await session.receive_verification_data(timeout_ms);
     if (initiator_reveal_payload.kind !== "commitment_initiator_nonce_reveal") {
         throw new Error("Expected a commitment_initiator_nonce_reveal message");
     }
