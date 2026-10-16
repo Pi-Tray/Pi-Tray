@@ -128,12 +128,16 @@ jobs:
         run: sudo sed -i "s|PLACEHOLDER_URL|https://github.com/${{ github.repository }}/releases/download/${{ needs.check.outputs.release_tag }}|" out/os_list.json
 
       - name: Upload as a workflow artifact
+        if: needs.check.outputs.should_publish == 'false' # only create an artifact for manual runs to avoid eating up quota
         uses: actions/upload-artifact@v4
         with:
           name: pi-tray-image
           path: out/*
           # already xz compressed
           compression-level: 0
+
+          # keep artifacts for a few days, so they can be downloaded if needed, but free up space for new ones quickly
+          retention-days: 3
 
       - name: Publish the release
         if: needs.check.outputs.should_publish == 'true'
