@@ -7,6 +7,8 @@ export interface PairingResult {
     peer_public_key: string;
 }
 
+export const PAIRING_CODE_LENGTH = 8;
+
 // using prop arg to avoid ambiguity. the order of concatenation MUST match (note that nonce is already concatenated via extract)
 // every part has a fixed length (checked before this is called), so the concatenation can't be shifted
 const derive_pairing_code = async (props: {
@@ -19,8 +21,8 @@ const derive_pairing_code = async (props: {
     const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(concatenated));
 
     const first_4_bytes_uint = new DataView(hash).getUint32(0, false);
-    const unpadded_code = first_4_bytes_uint % 100000000;
-    return unpadded_code.toString().padStart(8, "0");
+    const unpadded_code = first_4_bytes_uint % (10 ** PAIRING_CODE_LENGTH);
+    return unpadded_code.toString().padStart(PAIRING_CODE_LENGTH, "0");
 }
 
 /**

@@ -8,6 +8,7 @@ export const PairingUI = () => {
     }
 
     // TODO: style
+    // TODO: show time remaining as a progress bar
     return (
         <div>
             <p>Pairing code: {code}</p>
