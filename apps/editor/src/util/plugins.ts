@@ -4,7 +4,6 @@ import {readTextFile, watch} from "@tauri-apps/plugin-fs";
 import {Command} from "@tauri-apps/plugin-shell";
 import {platform} from "@tauri-apps/plugin-os";
 
-// TODO: does pi-tray want to be a monorepo?
 import type {PluginConfigTemplate, PluginLiveControllable} from "@pi-tray/types";
 
 import {in_plugin_env, plugin_env} from "./paths";
@@ -173,7 +172,7 @@ const get_package_plugin_info = (package_name: string): Promise<Record<string, P
     }
 
     const info_promise = (async () => {
-        const command = Command.sidecar("binaries/pi-tray-service", ["plugin-info", package_name]);
+        const command = Command.sidecar("binaries/pi-tray-service", ["package", "info", package_name]);
         const result = await command.execute();
 
         if (result.code !== 0) {

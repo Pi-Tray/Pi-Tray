@@ -6,7 +6,7 @@
     "types": "./src/index.ts",
     "exports": {
         ".": "./src/index.ts",
-        "./plugin-info": "./src/plugin_info.ts"
+        "./package-info": "./src/package_info.ts"
     },
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
@@ -14,11 +14,9 @@
         "dev": "tsx watch src/index.ts --host=127.0.0.1",
         "dev:lan": "tsx watch src/index.ts",
         "build": "tsc",
-        "plugin:setup": "node bin/plugin_setup.js",
-        "plugin:npm": "node bin/plugin_npm.js",
         "where:appdata": "node bin/where_appdata.js",
         "where:pi-tray": "node bin/where_appdata.js pi-tray",
-        "where:plugin-env": "node bin/where_appdata.js pi-tray/plugin-env",
+        "where:plugins": "node bin/where_appdata.js pi-tray/plugins",
         "package": "pnpm build && node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray-server --description \"Pi-Tray Server\" --icon ../editor/src-tauri/icons/icon.ico"
     },
     "author": "obfuscatedgenerated",

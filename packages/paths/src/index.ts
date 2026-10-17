@@ -19,8 +19,8 @@ export const data_dir = in_appdata("pi-tray");
 export const in_data_dir = (...segments: string[]): string => path.join(data_dir, ...segments);
 
 /**
- * Where plugins are installed, as an npm project of their own.
+ * Where plugins are installed.
  */
-export const plugin_env = in_data_dir("plugin-env");
+export const plugin_dir = in_data_dir("plugins");
 
-export const in_plugin_env = (...segments: string[]): string => path.join(plugin_env, ...segments);
+export const in_plugin_dir = (...segments: string[]): string => path.join(plugin_dir, ...segments);

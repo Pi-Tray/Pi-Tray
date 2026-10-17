@@ -1,12 +1,10 @@
 // pi-tray-service: the server, the supervisor and the editor's plugin helper in one executable, so they share one copy of node
 //   pi-tray-service [supervise]                       the supervisor, which runs "pi-tray-service server"
 //   pi-tray-service server                            the server
-//   pi-tray-service plugin-info|list-plugins <pkg>    what the editor asks about installed plugins
+//   pi-tray-service package info <pkg>    what the editor asks about installed packages
 //   pi-tray-service status|start|stop|restart|watch|quit|autostart …   the supervisor's commands
 //
 // each app is only loaded when its command is used: loading the server starts it
-
-import type {PluginInfoCommand} from "@pi-tray/server/plugin-info";
 
 const [command, ...command_args] = process.argv.slice(2);
 
@@ -32,10 +30,17 @@ switch (command) {
         require("@pi-tray/server");
         break;
 
-    case "plugin-info":
-    case "list-plugins": {
-        const plugin_info: typeof import("@pi-tray/server/plugin-info") = require("@pi-tray/server/plugin-info");
-        process.exitCode = plugin_info.run_plugin_info_command(command as PluginInfoCommand, command_args[0]);
+    case "package": {
+        const [subcommand, ...subcommand_args] = command_args;
+        const package_info: typeof import("@pi-tray/server/package-info") = require("@pi-tray/server/package-info");
+
+        if (subcommand === "info") {
+            process.exitCode = package_info.run_package_info_command(subcommand_args[0]);
+        } else {
+            console.error(`Unknown package command "${subcommand}", expected: info`);
+            process.exitCode = 1;
+        }
+
         break;
     }
 

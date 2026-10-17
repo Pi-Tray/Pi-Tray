@@ -1,17 +1,20 @@
 import {find_plugin_problems, Plugin} from "./types";
 
 import fs from "fs";
+import path from "path";
 import {createRequire} from "module";
-import {in_plugin_env} from "@pi-tray/paths";
+import {in_plugin_dir, plugin_dir} from "@pi-tray/paths";
 
-// create a custom require resolver that looks at the node_modules of the plugin-env directory
-const require_from_plugin_env = createRequire(in_plugin_env("package.json"));
+import {package_folder, split_plugin_reference} from "./package_location";
+
+// plain node's require, rather than the bundle's, which esbuild and pkg wrap. only ever given absolute paths
+const require_plugin = createRequire(plugin_dir + path.sep);
 
 // validated plugins, keyed by their full name e.g. @pi-tray/builtin/run_command
 const loaded_plugins = new Map<string, Plugin>();
 
-// every require cache entry that was created while loading a plugin, including the plugin's own dependencies
-// tracked this way rather than by path so that symlinked (npm link) plugins outside plugin-env are cleared too
+// every require cache entry that was created while loading a plugin, including the plugin's own dependencies,
+// so clearing the cache also catches dependencies that resolve outside the plugin's folder
 const plugin_module_paths = new Set<string>();
 
 const cache_clear_listeners = new Set<() => void>();
@@ -44,17 +47,17 @@ export const clear_plugin_cache = () => {
     loaded_plugins.clear();
 
     for (const module_path of plugin_module_paths) {
-        delete require_from_plugin_env.cache[module_path];
+        delete require_plugin.cache[module_path];
     }
 
     plugin_module_paths.clear();
 }
 
 /**
- * Loads a plugin module and validates its structure, or returns the already loaded copy.<br>
- * The module must export a plugin object as its default export with a `handle_push` function, and optionally a `display_name` string.<br>
- * Plugins stay loaded until {@link clear_plugin_cache} is called, which happens automatically when plugin-env's packages change.
- * @param name the module name to load
+ * Loads a plugin and validates its structure, or returns the already loaded copy.<br>
+ * The plugin's folder (e.g. <plugin dir>/@pi-tray/builtin/run_command) must export a plugin object as its default export.<br>
+ * Plugins stay loaded until {@link clear_plugin_cache} is called, which happens automatically when installed.json changes.
+ * @param name the plugin's full name, e.g. @pi-tray/builtin/run_command
  * @return the loaded plugin object
  */
 export const load_plugin = (name: string) => {
@@ -63,12 +66,15 @@ export const load_plugin = (name: string) => {
         return cached_plugin;
     }
 
+    // throws for a name that isn't a plugin reference, so it can never point outside plugin_dir
+    const {package_name, plugin_name} = split_plugin_reference(name);
+
     // remember what was already cached so we can tell which modules this plugin pulled in
-    const cache_before_load = new Set(Object.keys(require_from_plugin_env.cache));
+    const cache_before_load = new Set(Object.keys(require_plugin.cache));
 
-    const module = require_from_plugin_env(name);
+    const module = require_plugin(path.join(package_folder(package_name), plugin_name));
 
-    for (const module_path of Object.keys(require_from_plugin_env.cache)) {
+    for (const module_path of Object.keys(require_plugin.cache)) {
         if (!cache_before_load.has(module_path)) {
             plugin_module_paths.add(module_path);
         }
@@ -78,7 +84,7 @@ export const load_plugin = (name: string) => {
         throw new Error(`Plugin ${name} does not export a valid plugin object as default.`);
     }
 
-    const plugin = module?.default;
+    const plugin = module.default;
     const problems = find_plugin_problems(plugin);
 
     if (problems.length > 0) {
@@ -89,12 +95,10 @@ export const load_plugin = (name: string) => {
     return plugin as Plugin;
 }
 
-// installing, removing or updating packages changes these files, so drop every loaded plugin when they do
-for (const watched_file of ["package.json", "package-lock.json"]) {
-    fs.watchFile(in_plugin_env(watched_file), {interval: 1000}, () => {
-        console.log(`${watched_file} in plugin-env changed, clearing plugin cache.`);
-        clear_plugin_cache();
-    });
-}
+// installing, removing or updating a package changes installed.json, so drop every loaded plugin when it does
+const installed_registry = in_plugin_dir("installed.json");
 
-// TODO: might be zod time soon
+fs.watchFile(installed_registry, {interval: 1000}, () => {
+    console.log("installed.json changed, clearing plugin cache.");
+    clear_plugin_cache();
+});
