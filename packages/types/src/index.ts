@@ -82,6 +82,8 @@ interface PluginPushHandlerData {
      * The connection to the client that pushed the button.
      */
     ws: PluginSocket;
+
+    data_dir: string;
 }
 
 export type PluginPushHandler = (data: PluginPushHandlerData) => Promise<void>;
@@ -183,6 +185,8 @@ export type PluginLiveState<Controls extends PluginLiveControllable> = Partial<P
 export interface PluginLiveContext<Controls extends PluginLiveControllable> {
     config: PluginConfig;
     update: (state: PluginLiveState<Controls>) => void;
+
+    data_dir: string;
 
     /**
      * Aborted when the tile stops, e.g. its cell or config changed or the plugin was reloaded.

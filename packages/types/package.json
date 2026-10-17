@@ -1,6 +1,6 @@
 {
     "name": "@pi-tray/types",
-    "version": "0.1.0-alpha",
+    "version": "0.2.0",
     "description": "Types shared by Pi-Tray's server, editor, client and plugins",
     "main": "./src/index.ts",
     "types": "./src/index.ts",

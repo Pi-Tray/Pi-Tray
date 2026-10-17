@@ -24,3 +24,10 @@ export const in_data_dir = (...segments: string[]): string => path.join(data_dir
 export const plugin_dir = in_data_dir("plugins");
 
 export const in_plugin_dir = (...segments: string[]): string => path.join(plugin_dir, ...segments);
+
+/**
+ * Where plugins (are meant to) store their data.
+ */
+export const plugin_data_dir = in_data_dir("plugin-data");
+
+export const in_plugin_data_dir = (...segments: string[]): string => path.join(plugin_data_dir, ...segments);

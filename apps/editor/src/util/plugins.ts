@@ -1,12 +1,11 @@
 import {useEffect, useMemo, useState} from "react";
 
-import {exists, mkdir, readDir, readTextFile, watch} from "@tauri-apps/plugin-fs";
+import {exists, mkdir, readDir, watch} from "@tauri-apps/plugin-fs";
 import {Command} from "@tauri-apps/plugin-shell";
-import {platform} from "@tauri-apps/plugin-os";
 
 import type {PluginConfigTemplate, PluginLiveControllable} from "@pi-tray/types";
 
-import {in_plugin_dir, plugin_dir} from "./paths";
+import {plugin_dir} from "./paths";
 import {join} from "@tauri-apps/api/path";
 
 /**

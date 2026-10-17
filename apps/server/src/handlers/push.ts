@@ -4,6 +4,8 @@ import {get_loaded_grid} from "../data";
 import {load_plugin} from "../plugins";
 import {unwrap_plugin_reference} from "../types";
 import {plugin_context} from "../plugin_context";
+import {in_plugin_data_dir} from "@pi-tray/paths";
+import {package_data_folder, split_plugin_reference} from "../package_location";
 
 export default (async (client, payload) => {
     const grid = get_loaded_grid();
@@ -23,11 +25,14 @@ export default (async (client, payload) => {
         if (plugin.handle_push) {
             const handle_push = plugin.handle_push;
 
+            const data_dir = package_data_folder(split_plugin_reference(plugin_name).package_name);
+
             await plugin_context.run({kind: "push", plugin_name, x: payload.x, y: payload.y}, () => handle_push({
                 x: payload.x,
                 y: payload.y,
                 config: plugin_config,
-                ws: client.as_plugin_socket()
+                ws: client.as_plugin_socket(),
+                data_dir
             }));
         }
     } catch (error) {

@@ -4,6 +4,7 @@ import {add_grid_change_listener, get_loaded_grid} from "../data";
 import {add_plugin_cache_clear_listener, load_plugin} from "../plugins";
 import {clear_live_state, LiveCellState, set_live_state} from "./state";
 import {plugin_context, set_tile_error_handler} from "../plugin_context";
+import {package_data_folder, split_plugin_reference} from "../package_location";
 
 // the fastest a single tile can send updates to clients, faster updates are merged into the next send
 const MIN_UPDATE_INTERVAL_MS = 100;
@@ -223,13 +224,17 @@ const start_tile = (key: string, desired: DesiredTile) => {
     };
 
     try {
+        const data_dir = package_data_folder(split_plugin_reference(desired.plugin_name).package_name);
+
         const result: unknown = plugin_context.run({kind: "tile", key, plugin_name: desired.plugin_name, tile}, () => live.init({
             config: desired.config,
             update,
             signal: controller.signal,
 
             x: desired.col_idx,
-            y: desired.row_idx
+            y: desired.row_idx,
+
+            data_dir
         }));
 
         // init may be async, so a cleanup or a failure can arrive later
