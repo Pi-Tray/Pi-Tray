@@ -1,0 +1,29 @@
+{
+    "name": "@pi-tray/plugin-build",
+    "version": "0.1.0",
+    "description": "Builds Pi-Tray plugins into per-platform archives, with their native modules built for each platform",
+    "bin": {
+        "pi-tray-plugin": "./dist/cli.js"
+    },
+    "files": [
+        "dist",
+        "README.md"
+    ],
+    "scripts": {
+        "build": "tsc && node scripts/bake-node-version.mjs",
+        "prepack": "pnpm run build"
+    },
+    "engines": {
+        "node": ">=20"
+    },
+    "dependencies": {
+        "esbuild": "^0.25.0",
+        "tar": "^7.4.3"
+    },
+    "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:"
+    },
+    "author": "obfuscatedgenerated",
+    "license": "MIT"
+}

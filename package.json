@@ -13,5 +13,8 @@
         "pe-library": "^1.0.1",
         "resedit": "^2.0.3"
     },
-    "packageManager": "pnpm@10.28.0"
+    "packageManager": "pnpm@10.28.0",
+    "engines": {
+        "node": ">=22"
+    }
 }

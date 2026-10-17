@@ -10,9 +10,11 @@ import {exec as run_pkg} from "@yao-pkg/pkg";
 import * as PE from "pe-library";
 import * as ResEdit from "resedit";
 
+import {node_major} from "./node-version.mjs";
+
 // pinned rather than following this machine's node: pkg's cross-compiled node 22 executables are broken
 // https://yao-pkg.github.io/pkg/guide/targets#cross-compilation-support
-const NODE_TARGET = "node24";
+const NODE_TARGET = `node${node_major()}`;
 
 const PUBLISHER = "Pi-Tray";
 

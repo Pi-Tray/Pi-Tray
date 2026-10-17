@@ -1,0 +1,14 @@
+{
+    // compiled to dist when packed (prepack), since plugins run it from their node_modules rather than from source
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "outDir": "dist",
+        "rootDir": "src",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true
+    },
+    "include": ["src"]
+}
