@@ -1,0 +1,14 @@
+{
+    "name": "@pi-tray/package-spec",
+    "version": "0.0.0",
+    "private": true,
+    "description": "",
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "files": [
+        "src"
+    ],
+    "devDependencies": {
+        "typescript": "catalog:"
+    }
+}

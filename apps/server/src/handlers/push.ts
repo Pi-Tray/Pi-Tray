@@ -5,7 +5,8 @@ import {load_plugin} from "../plugins";
 import {unwrap_plugin_reference} from "../types";
 import {plugin_context} from "../plugin_context";
 import {in_plugin_data_dir} from "@pi-tray/paths";
-import {package_data_folder, split_plugin_reference} from "../package_location";
+import {package_data_folder} from "../package_location";
+import {split_plugin_reference} from "@pi-tray/package-spec";
 
 export default (async (client, payload) => {
     const grid = get_loaded_grid();

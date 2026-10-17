@@ -26,6 +26,7 @@
         "@pi-tray/types": "workspace:*",
         "@pi-tray/server-config": "workspace:*",
         "@pi-tray/secure-channel": "workspace:*",
+        "@pi-tray/package-spec": "workspace:*",
         "@types/ws": "^8.18.1",
         "minimist": "catalog:",
         "ws": "^8.18.3"

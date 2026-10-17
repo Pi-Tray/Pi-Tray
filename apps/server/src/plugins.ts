@@ -5,7 +5,8 @@ import path from "path";
 import {createRequire} from "module";
 import {in_plugin_dir, plugin_dir} from "@pi-tray/paths";
 
-import {package_folder, split_plugin_reference} from "./package_location";
+import {package_folder} from "./package_location";
+import {split_plugin_reference} from "@pi-tray/package-spec";
 
 // plain node's require, rather than the bundle's, which esbuild and pkg wrap. only ever given absolute paths
 const require_plugin = createRequire(plugin_dir + path.sep);

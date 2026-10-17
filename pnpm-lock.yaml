@@ -212,6 +212,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@pi-tray/package-spec':
+        specifier: workspace:*
+        version: link:../../packages/package-spec
       '@pi-tray/paths':
         specifier: workspace:*
         version: link:../../packages/paths
@@ -284,6 +287,12 @@ importers:
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
+  packages/package-spec:
+    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
