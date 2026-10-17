@@ -1,0 +1,60 @@
+name: Plugin tools update
+
+# called from a plugin's repo on a schedule, opening a pull request when there's a newer @pi-tray/types or
+# @pi-tray/plugin-build (it also moves the plugin's workflows to the matching plugin-build-v tag, including the one calling this):
+#
+#   on:
+#     schedule:
+#       - cron: "0 6 * * 1"
+#     workflow_dispatch:
+#   permissions:
+#     contents: write
+#     pull-requests: write
+#   jobs:
+#     update:
+#       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-update.yml@plugin-build-v<version>
+#
+# the plugin's repo needs "Allow GitHub Actions to create and approve pull requests" on (Settings > Actions > General)
+
+on:
+  workflow_call:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      # only to run the tool, nothing is built here
+      - run: npm ci --ignore-scripts
+
+      - id: update
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npx pi-tray-plugin update
+
+      # the new tarball urls have to be in the lockfile too, or npm ci fails
+      - if: steps.update.outputs.changed == 'true'
+        run: npm install --package-lock-only --ignore-scripts
+
+      # pull requests opened with the workflow's own token don't start other workflows,
+      # so the release workflow's checks run once it's merged to main
+      - if: steps.update.outputs.changed == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: pi-tray-tools-update
+          commit-message: Update Pi-Tray plugin tools
+          title: Update Pi-Tray plugin tools
+          body: |
+            ${{ steps.update.outputs.summary }}
+
+            Check the Pi-Tray release notes for anything that needs changing in the plugin, especially for a new @pi-tray/types version.
+          delete-branch: true

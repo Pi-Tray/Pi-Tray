@@ -1,6 +1,6 @@
 {
     "name": "@pi-tray/plugin-build",
-    "version": "0.1.0-alpha",
+    "version": "0.1.0-alpha.1",
     "description": "Builds Pi-Tray plugins into per-platform archives, with their native modules built for each platform",
     "bin": {
         "pi-tray-plugin": "./dist/cli.js"
@@ -18,10 +18,12 @@
     },
     "dependencies": {
         "esbuild": "^0.25.0",
+        "semver": "^7.8.5",
         "tar": "^7.4.3"
     },
     "devDependencies": {
         "@types/node": "catalog:",
+        "@types/semver": "^7.8.0",
         "typescript": "catalog:"
     },
     "author": "obfuscatedgenerated",

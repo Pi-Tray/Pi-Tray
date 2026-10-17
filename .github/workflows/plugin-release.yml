@@ -31,6 +31,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # every runner installs from it, so they all build the same dependency versions
+      - name: Check for package-lock.json
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "::error::No package-lock.json. Run npm install and commit it"
+            exit 1
+          fi
+
       # the runner's own node is enough to see which packages are native, nothing is compiled or built here
       - run: npm ci --ignore-scripts
 

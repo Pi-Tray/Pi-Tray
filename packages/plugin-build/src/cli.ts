@@ -1,9 +1,12 @@
 #!/usr/bin/env node
+import fs from "fs";
 import path from "path";
+import {randomUUID} from "crypto";
 import {parseArgs} from "util";
 
 import {build, plan} from "./build";
 import {write_manifest} from "./manifest";
+import {update, UpdateChange} from "./update";
 
 const USAGE = `Usage: pi-tray-plugin <command> [options]
 
@@ -11,6 +14,7 @@ Commands:
   plan                       Print the targets to build (as a github actions matrix) and the node version, as JSON
   build                      Build this machine's target into plugin-dist/
   manifest --base-url <url>  Combine the built archives in plugin-dist/ into manifest.json
+  update                     Update @pi-tray/types, @pi-tray/plugin-build and the workflows using them to their newest releases
 
 Options:
   --root <dir>               The plugin's folder (default: the current folder)
@@ -19,7 +23,8 @@ Options:
   --skip-verify              build: don't load the built plugins to check them (the manifest won't list them)
   --base-url <url>           manifest: where the archives will be downloaded from
   --release-notes-url <url>  manifest: the release's page
-  --repository-url <url>     manifest: used if package.json has no repository`;
+  --repository-url <url>     manifest: used if package.json has no repository
+  --source-repo <owner/repo> update: where the tools are released (default: Pi-Tray/Pi-Tray)`;
 
 const {positionals, values} = parseArgs({
     allowPositionals: true,
@@ -31,12 +36,28 @@ const {positionals, values} = parseArgs({
         "base-url": {type: "string"},
         "release-notes-url": {type: "string"},
         "repository-url": {type: "string"},
+        "source-repo": {type: "string"},
         "help": {type: "boolean", default: false}
     }
 });
 
 const [command] = positionals;
 const root_dir = path.resolve(values.root);
+
+/**
+ * Hands the update's result to the next steps of a github actions job, e.g. one that opens a pull request.
+ */
+const write_github_outputs = (changes: UpdateChange[]) => {
+    const output_path = process.env.GITHUB_OUTPUT;
+    if (!output_path) {
+        return;
+    }
+
+    const summary = changes.map((change) => `- ${change.what}: ${change.from} → ${change.to}`).join("\n");
+    const delimiter = `summary_${randomUUID()}`;
+
+    fs.appendFileSync(output_path, `changed=${changes.length > 0}\nsummary<<${delimiter}\n${summary}\n${delimiter}\n`);
+}
 
 const run = async () => {
     switch (command) {
@@ -60,6 +81,23 @@ const run = async () => {
                 repository_url: values["repository-url"]
             });
             console.log(`Wrote manifest.json for ${manifest.name}@${manifest.version}: ${Object.keys(manifest.targets).join(", ")}`);
+            return;
+        }
+
+        case "update": {
+            const changes = await update(root_dir, {source_repo: values["source-repo"], github_token: process.env.GITHUB_TOKEN});
+
+            if (changes.length === 0) {
+                console.log("Already up to date");
+            } else {
+                for (const change of changes) {
+                    console.log(`${change.what}: ${change.from} -> ${change.to}`);
+                }
+
+                console.log("Run npm install to update package-lock.json");
+            }
+
+            write_github_outputs(changes);
             return;
         }
 
