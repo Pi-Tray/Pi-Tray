@@ -1,6 +1,6 @@
 {
     "name": "@pi-tray/plugin-build",
-    "version": "0.1.0",
+    "version": "0.1.0-alpha",
     "description": "Builds Pi-Tray plugins into per-platform archives, with their native modules built for each platform",
     "bin": {
         "pi-tray-plugin": "./dist/cli.js"
