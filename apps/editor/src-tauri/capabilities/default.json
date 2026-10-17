@@ -32,50 +32,6 @@
       "identifier": "shell:allow-execute",
       "allow": [
         {
-          "name": "npm-install",
-          "cmd": "npm",
-          "args": [
-            "install",
-            {
-              "validator": "\\S+"
-            }
-          ],
-          "sidecar": false
-        },
-        {
-          "name": "npm-uninstall",
-          "cmd": "npm",
-          "args": [
-            "uninstall",
-            {
-              "validator": "\\S+"
-            }
-          ],
-          "sidecar": false
-        },
-        {
-          "name": "npm-install-windows",
-          "cmd": "cmd.exe",
-          "args": [
-            "/c",
-            {
-              "validator": "npm install \\S+"
-            }
-          ],
-          "sidecar": false
-        },
-        {
-          "name": "npm-uninstall-windows",
-          "cmd": "cmd.exe",
-          "args": [
-            "/c",
-            {
-              "validator": "npm uninstall \\S+"
-            }
-          ],
-          "sidecar": false
-        },
-        {
           "name": "binaries/pi-tray-service",
           "args": true,
           "sidecar": true

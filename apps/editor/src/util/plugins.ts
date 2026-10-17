@@ -1,35 +1,43 @@
 import {useEffect, useMemo, useState} from "react";
 
-import {readTextFile, watch} from "@tauri-apps/plugin-fs";
+import {exists, mkdir, readDir, readTextFile, watch} from "@tauri-apps/plugin-fs";
 import {Command} from "@tauri-apps/plugin-shell";
 import {platform} from "@tauri-apps/plugin-os";
 
 import type {PluginConfigTemplate, PluginLiveControllable} from "@pi-tray/types";
 
-import {in_plugin_env, plugin_env} from "./paths";
-
-
-const package_json = await in_plugin_env("package.json");
+import {in_plugin_dir, plugin_dir} from "./paths";
+import {join} from "@tauri-apps/api/path";
 
 /**
- * Lists the package names of installed plugins by reading the `package.json` file in the plugin-env directory.
- * @returns array of installed plugin package names
+ * Lists the installed packages from the plugin folder, one folder per package, with scoped ones (@scope/name) one level down.
+ * @returns array of installed package names
  */
 export const list_installed_packages = async (): Promise<string[]> => {
-    try {
-        const text = await readTextFile(package_json);
-        const data = JSON.parse(text);
-
-        if (data && data.dependencies) {
-            return Object.keys(data.dependencies);
-        } else {
-            console.warn("No dependencies found in package.json");
-            return [];
-        }
-    } catch (error) {
-        console.error("Error listing installed plugins:", error);
+    if (!await exists(plugin_dir)) {
         return [];
     }
+
+    const package_names: string[] = [];
+
+    for (const entry of await readDir(plugin_dir)) {
+        // skips .tmp and .pending
+        if (!entry.isDirectory || entry.name.startsWith(".")) {
+            continue;
+        }
+
+        if (entry.name.startsWith("@")) {
+            for (const scoped_entry of await readDir(await join(plugin_dir, entry.name))) {
+                if (scoped_entry.isDirectory) {
+                    package_names.push(`${entry.name}/${scoped_entry.name}`);
+                }
+            }
+        } else {
+            package_names.push(entry.name);
+        }
+    }
+
+    return package_names.sort();
 }
 
 const change_listeners = new Set<() => void>();
@@ -91,55 +99,11 @@ export const usePackageList = (set_null_when_reindexing = true) => {
 }
 
 /**
- * Installs a package in the plugin-env directory by executing `npm install <package_ref>`.
+ * Installs a package in the plugins directory.
  * @param package_ref the package reference to install, such as a name or git url
  */
 export const install_package = async (package_ref: string) => {
-    let command: Command<string>;
-
-    if (platform() === "windows") {
-        // windows command resolution is bonkers, so this is actually a harshly restricted call to cmd.exe
-        command = Command.create("npm-install-windows", ["/c", `npm install ${package_ref}`], {
-            cwd: plugin_env,
-        });
-    } else {
-        command = Command.create("npm-install", ["install", package_ref], {
-            cwd: plugin_env,
-        });
-    }
-
-    const result = await command.execute();
-
-    if (result.code !== 0) {
-        console.error("Failed to install package:", package_ref, result);
-        throw new Error(`Failed to install package: ${package_ref}`);
-    } else {
-        console.log("Package installed successfully:", package_ref);
-        //notify_plugin_list_change(); // not necessary, the watcher will handle this
-    }
-}
-
-/**
- * Asks pi-tray-service to list the plugins in a given package.
- * @param package_name the name of the package to list plugins from e.g. @pi-tray/builtin
- * @param fully_qualify whether to prepend the package name to each plugin name (default: true)
- */
-export const list_plugins_in_package = async (package_name: string, fully_qualify = true): Promise<string[]> => {
-    const command = Command.sidecar("binaries/pi-tray-service", ["list-plugins", package_name]);
-    const result = await command.execute();
-
-    if (result.code !== 0) {
-        console.error("Failed to list plugins in package:", package_name, result);
-        throw new Error(`Failed to list plugins in package: ${package_name}`);
-    }
-
-    const plugins = JSON.parse(result.stdout.trim());
-
-    if (fully_qualify) {
-        return plugins.map((plugin: string) => `${package_name}/${plugin}`);
-    } else {
-        return plugins;
-    }
+   throw new Error("not yet implemented for new package system");
 }
 
 export interface PluginInfo {
@@ -350,13 +314,10 @@ export const usePluginList = () => {
 // shared with the server, re-exported so the editor's existing imports keep working
 export {unwrap_plugin_reference} from "@pi-tray/types";
 
-// watch the folder rather than the files, as package-lock.json doesn't exist until the first install and watching a missing file fails
-// package.json changes on install/uninstall, package-lock.json also changes when a git package is updated in place
-await watch(plugin_env, async (event) => {
-    const packages_changed = event.paths.some(changed_path => changed_path.endsWith("package.json") || changed_path.endsWith("package-lock.json"));
-
-    if (packages_changed) {
-        console.log("plugin-env packages changed, notifying listeners...");
-        notify_package_list_change();
-    }
-});
+// installing or removing a package adds or removes its folder. recursive, as scoped packages are a folder deeper
+// TODO: watch installed.json instead once the service writes it
+await mkdir(plugin_dir, {recursive: true});
+await watch(plugin_dir, () => {
+    console.log("Plugin packages changed, notifying listeners...");
+    notify_package_list_change();
+}, {recursive: true});
