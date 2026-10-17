@@ -29,30 +29,35 @@ export const split_plugin_reference = (reference: string): { package_name: strin
 }
 
 // the parser's output with kind added, a union over every kind unless narrowed to one
-export type ParsedSpec<Kind extends UsableParserKind = UsableParserKind> =
+export type PackageSource<Kind extends UsableParserKind = UsableParserKind> =
     {[Each in Kind]: ParserOutputs[Each] & {kind: Each}}[Kind];
 
 // generic over the kind, so the parser and its output are known to match
-const parse_with = <Kind extends UsableParserKind>(kind: Kind, spec: string): ParsedSpec<Kind> => {
+const parse_with = <Kind extends UsableParserKind>(kind: Kind, spec: string): PackageSource<Kind> => {
     return {...parsers[kind].parse(spec), kind};
 }
 
-const format_with = <Kind extends UsableParserKind>(parsed: ParsedSpec<Kind>): string => {
+const format_with = <Kind extends UsableParserKind>(parsed: PackageSource<Kind>): string => {
     const parser: Parser<Kind, ParserOutputs[Kind]> = parsers[parsed.kind];
     return `${parsed.kind}:${parser.format(parsed)}`;
 }
 
-export type ParseResult = {ok: true, spec: ParsedSpec} | {ok: false, error: string};
+const locate_with = <Kind extends UsableParserKind>(parsed: PackageSource<Kind>) => {
+    const parser: Parser<Kind, ParserOutputs[Kind]> = parsers[parsed.kind];
+    return parser.locate(parsed);
+}
 
-const try_parse_with = (kind: UsableParserKind, spec: string): ParseResult => {
+export type SpecParseResult = {ok: true, source: PackageSource} | {ok: false, error: string};
+
+const try_parse_with = (kind: UsableParserKind, spec: string): SpecParseResult => {
     try {
-        return {ok: true, spec: parse_with(kind, spec)};
+        return {ok: true, source: parse_with(kind, spec)};
     } catch (error) {
         return {ok: false, error: error instanceof Error ? error.message : String(error)};
     }
 }
 
-export const parse_spec = (spec: string): ParseResult => {
+export const parse_spec = (spec: string): SpecParseResult => {
     const trimmed = spec.trim();
     const prefixed = has_kind_prefix(trimmed);
 
@@ -70,8 +75,12 @@ export const parse_spec = (spec: string): ParseResult => {
     return {ok: false, error: "Not a recognised specifier"};
 }
 
-export const format_spec = (parsed: ParsedSpec): string => {
-    return format_with(parsed);
+export const format_source = (source: PackageSource): string => {
+    return format_with(source);
 }
 
-export const is_trusted_source = (parsed: ParsedSpec): boolean => (parsed.kind === "github" && parsed.owner.toLowerCase() === "pi-tray");
+export const locate_source = (source: PackageSource) => {
+    return locate_with(source);
+}
+
+export const is_trusted_source = (source: PackageSource): boolean => (source.kind === "github" && source.owner.toLowerCase() === "pi-tray");
