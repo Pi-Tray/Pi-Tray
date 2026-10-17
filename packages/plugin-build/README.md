@@ -1,6 +1,6 @@
 # @pi-tray/plugin-build
 
-Builds a Pi-Tray plugin into archives the server can load, one per platform when it has native modules.
+Builds a Pi-Tray plugin into archives the server can load, one per platform when it has platform-specific dependencies.
 
 ## Setting up a plugin
 
@@ -48,7 +48,10 @@ Each archive holds a `package` folder:
 - `node_modules`: the runtime dependencies exactly as `npm ci` installed them on the machine that built it
 - `package.json`: no dependencies or install scripts, plus the target and Node version it was built for
 
-A plugin without native modules builds one `any` archive. One with native modules builds an archive on each platform's runner, where `npm ci` uses the module's prebuilds or compiles it, and other platforms' binaries are removed from packages that ship all of them.
+A plugin whose dependencies are the same on every platform builds one `any` archive. One with platform-specific dependencies builds an archive on each platform's runner, where `npm ci` installs them for that platform (using a native module's prebuilds or compiling it), and other platforms' binaries are removed from packages that ship all of them. A dependency is platform-specific if it:
+- has a native module (node-gyp, node-pre-gyp, prebuildify, or any `.node` file)
+- is only installed on some platforms (`os` or `cpu` in its package.json, including ones the lockfile lists that this machine skipped), or loads such a package
+- has an install script, which may compile or download something for the platform it runs on
 
 The release has `manifest.json`, which the installer reads to pick `targets["<platform>-<arch>"]`, or `targets.any`. It also describes the release for a plugin browser: the package's description, author, license, repository and homepage, the `@pi-tray/types` version it was built against (`api_version`), its `platforms`, and each plugin's name, description, whether it's pushable, its live controls and its settings.
 
@@ -68,7 +71,7 @@ In package.json, all optional:
 
 - `entry`: the file exporting the plugins
 - `external`: dependencies to leave out of the archive, e.g. optional ones a dependency only tries to load
-- `targets`: the platforms to build for when there are native modules, e.g. a Windows-only plugin. Default: win32, darwin and linux, each x64 and arm64
+- `targets`: the platforms to build for when there are platform-specific dependencies, e.g. a Windows-only plugin. Default: win32, darwin and linux, each x64 and arm64
 
 ## Commands
 

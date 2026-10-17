@@ -8,7 +8,7 @@ import * as esbuild from "esbuild";
 import {create as create_tar} from "tar";
 
 import {read_plugin_config} from "./config";
-import {collect_runtime_packages, read_json} from "./dependencies";
+import {collect_runtime_packages, os_restricted_in_lockfile, read_json} from "./dependencies";
 import {server_node_major} from "./node_version";
 import {prune_other_targets} from "./prune";
 import {ANY_TARGET, host_target, runner_for_target} from "./targets";
@@ -28,7 +28,7 @@ const PLUGIN_NAME_PATTERN = /^[A-Za-z0-9_$-]+$/;
 const COPIED_ROOT_FILES = /^(readme|license|licence|notice)(\..*)?$/i;
 
 export interface BuildOptions {
-    /** The target being built, which must be this machine's, or "any" for a plugin without native modules. Default: this machine's */
+    /** The target being built, which must be this machine's, or "any" for a plugin that's the same on every platform. Default: this machine's */
     target?: string;
 
     /** Where archives go, relative to the plugin's folder */
@@ -41,7 +41,10 @@ export interface BuildOptions {
 interface PluginAnalysis {
     config: PluginConfig;
     packages: Map<string, PackageRecord>;
-    native_packages: PackageRecord[];
+    platform_packages: PackageRecord[];
+
+    /** Packages the lockfile only installs on some platforms, which this machine may not have installed */
+    lockfile_platform_packages: string[];
 }
 
 const describe_bytes = (bytes: number): string => {
@@ -64,18 +67,23 @@ const analyse_plugin = (root_dir: string): PluginAnalysis => {
         throw new Error(`These dependencies aren't installed, run npm ci first:\n  ${missing.join("\n  ")}`);
     }
 
-    const native_packages = [...packages.values()].filter((record) => record.native);
+    const platform_packages = [...packages.values()].filter((record) => record.platform_reason !== null);
+    const lockfile_platform_packages = os_restricted_in_lockfile(root_dir, config.external_names);
 
-    return {config, packages, native_packages};
+    return {config, packages, platform_packages, lockfile_platform_packages};
+}
+
+const is_platform_specific = (analysis: PluginAnalysis): boolean => {
+    return analysis.platform_packages.length > 0 || analysis.lockfile_platform_packages.length > 0;
 }
 
 /**
- * The targets the plugin needs building for, as a github actions matrix (just "any" for a plugin with no native modules),
+ * The targets the plugin needs building for, as a github actions matrix (just "any" for a plugin that's the same on every platform),
  * and the node version to build them with.
  */
 export const plan = (root_dir: string): BuildPlan => {
-    const {config, native_packages} = analyse_plugin(root_dir);
-    const targets = native_packages.length > 0 ? config.targets : [ANY_TARGET];
+    const analysis = analyse_plugin(root_dir);
+    const targets = is_platform_specific(analysis) ? analysis.config.targets : [ANY_TARGET];
 
     return {
         matrix: {
@@ -247,14 +255,14 @@ const archive_base_name = (package_name: string, version: string, target: string
 }
 
 /**
- * Works out the target to build: "any" without native modules, otherwise this machine's, as npm ci built them for it.
+ * Works out the target to build: "any" if every package is the same on every platform, otherwise this machine's, as npm ci installed them for it.
  */
 const resolve_target = (analysis: PluginAnalysis, requested_target: string | undefined): string => {
-    const {config, native_packages} = analysis;
+    const {config, platform_packages, lockfile_platform_packages} = analysis;
 
-    if (native_packages.length === 0) {
+    if (!is_platform_specific(analysis)) {
         if (requested_target && requested_target !== ANY_TARGET) {
-            console.log(`No native modules, so building for any platform instead of ${requested_target}`);
+            console.log(`Nothing depends on the platform, so building for any platform instead of ${requested_target}`);
         }
 
         return ANY_TARGET;
@@ -263,20 +271,31 @@ const resolve_target = (analysis: PluginAnalysis, requested_target: string | und
     const target = requested_target ?? host_target();
 
     if (target !== host_target()) {
-        throw new Error(`Native modules can only be built for this machine (${host_target()}), not ${target}. Build ${target} on a ${target} runner`);
+        throw new Error(`Platform-specific packages can only be built for this machine (${host_target()}), not ${target}. Build ${target} on a ${target} runner`);
     }
 
-    // npm ci compiled any native modules for the node running this, which has to be the node the server runs them on
+    // npm ci compiled any native modules (and ran install scripts) with the node running this, which has to be the node the server runs them on
     const running_major = Number(process.versions.node.split(".")[0]);
     if (running_major !== NODE_MAJOR) {
-        throw new Error(`Building with node ${process.versions.node}, but the server runs node ${NODE_MAJOR}, so its native modules may not load there. Use node ${NODE_MAJOR} and run npm ci again`);
+        throw new Error(`Building with node ${process.versions.node}, but the server runs node ${NODE_MAJOR}, so what npm ci built may not load there. Use node ${NODE_MAJOR} and run npm ci again`);
     }
 
     if (!config.targets.includes(target)) {
         throw new Error(`${target} isn't one of this plugin's targets (${config.targets.join(", ")})`);
     }
 
-    console.log(`Native modules: ${native_packages.map((record) => `${record.name}@${record.version}`).join(", ")}`);
+    // a package like koffi or esbuild has a platform package for every platform, so the ones for other platforms are only counted
+    const installed_names = new Set(platform_packages.map((record) => record.name));
+    const other_platform_packages = lockfile_platform_packages.filter((name) => !installed_names.has(name));
+
+    const descriptions = platform_packages.map((record) => `${record.name}@${record.version} (${record.platform_reason})`);
+    if (other_platform_packages.length > 0) {
+        descriptions.push(other_platform_packages.length <= 3
+            ? `${other_platform_packages.join(", ")} (only installed on other platforms)`
+            : `${other_platform_packages.length} packages only installed on other platforms, e.g. ${other_platform_packages[0]}`);
+    }
+
+    console.log(`Platform-specific packages: ${descriptions.join(", ")}`);
     return target;
 }
 
@@ -293,7 +312,7 @@ export const build = async (root_dir: string, options: BuildOptions): Promise<Ar
     const {config, packages} = analysis;
     const {manifest} = config;
 
-    // native modules are built by npm ci on the machine running this, so only this machine's target can be built
+    // platform-specific packages were installed by npm ci on the machine running this, so only this machine's target can be built
     const target = resolve_target(analysis, options.target);
 
     const out_dir = path.resolve(root_dir, options.out_dir);

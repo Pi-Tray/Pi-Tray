@@ -56,21 +56,69 @@ const contains_node_binary = (dir: string): boolean => {
     return false;
 }
 
+const INSTALL_SCRIPTS = ["preinstall", "install", "postinstall"];
+
 /**
- * Whether a package contains a native module, so the plugin has to be built on each platform.<br>
- * Catches node-gyp packages (binding.gyp), node-pre-gyp ones ("binary"), prebuildify ones (prebuilds/),
- * and anything else that ships a compiled .node file, e.g. koffi and napi-rs platform packages.
+ * Why what npm installs for a package depends on the platform, so a plugin using it has to be built on each platform.
+ * - a native module: node-gyp (binding.gyp), node-pre-gyp ("binary"), prebuildify (prebuilds/), or any compiled .node file
+ * - only installed on some platforms ("os" or "cpu"), e.g. a napi-rs package or one holding an executable, like @esbuild/win32-x64
+ * - an install script, which may compile or download something for the platform it runs on, e.g. ffmpeg-static.
+ *   some only print a message, which just means building per platform when it wasn't needed
+ * @returns the reason, or null if it's the same on every platform
  */
-export const is_native_package = (package_dir: string, manifest: PackageManifest): boolean => {
-    if (manifest.gypfile || manifest.binary) {
-        return true;
+export const platform_reason_for = (package_dir: string, manifest: PackageManifest): string | null => {
+    if (manifest.gypfile || manifest.binary || fs.existsSync(path.join(package_dir, "binding.gyp"))
+        || fs.existsSync(path.join(package_dir, "prebuilds")) || contains_node_binary(package_dir)) {
+        return "native module";
     }
 
-    if (fs.existsSync(path.join(package_dir, "binding.gyp")) || fs.existsSync(path.join(package_dir, "prebuilds"))) {
-        return true;
+    if (manifest.os || manifest.cpu) {
+        return "only installed on some platforms";
     }
 
-    return contains_node_binary(package_dir);
+    const install_script = INSTALL_SCRIPTS.find((script_name) => manifest.scripts?.[script_name]);
+    if (install_script) {
+        return `${install_script} script`;
+    }
+
+    return null;
+}
+
+interface LockfilePackage {
+    dev?: boolean;
+    os?: string[];
+    cpu?: string[];
+}
+
+/**
+ * Runtime packages the lockfile says npm only installs on some platforms, including ones this machine skipped,
+ * e.g. chokidar's fsevents, which is only installed on macs. Without it, planning on linux would miss them.
+ * @returns their names, or an empty list if there's no lockfile
+ */
+export const os_restricted_in_lockfile = (root_dir: string, excluded_names: Set<string>): string[] => {
+    const lockfile_path = path.join(root_dir, "package-lock.json");
+
+    if (!fs.existsSync(lockfile_path)) {
+        return [];
+    }
+
+    const lockfile = read_json<{packages?: Record<string, LockfilePackage>}>(lockfile_path);
+    const names = new Set<string>();
+
+    for (const [package_path, entry] of Object.entries(lockfile.packages ?? {})) {
+        if (!package_path || entry.dev || !(entry.os || entry.cpu)) {
+            continue;
+        }
+
+        // node_modules/a/node_modules/@scope/b is @scope/b
+        const name = package_path.slice(package_path.lastIndexOf("node_modules/") + "node_modules/".length);
+
+        if (!excluded_names.has(name)) {
+            names.add(name);
+        }
+    }
+
+    return [...names].sort();
 }
 
 /**
@@ -135,9 +183,8 @@ export const collect_runtime_packages = (root_dir: string, excluded_names: Set<s
             name,
             version: manifest.version ?? "0.0.0",
             dir: package_dir,
-            native: is_native_package(package_dir, manifest),
-            // a platform package, e.g. @koromix/koffi-win32-x64, which npm only installs on its own platform
-            platform_specific: Boolean(manifest.os || manifest.cpu),
+            platform_reason: platform_reason_for(package_dir, manifest),
+            os_restricted: Boolean(manifest.os || manifest.cpu),
             children: []
         };
 
@@ -159,16 +206,16 @@ export const collect_runtime_packages = (root_dir: string, excluded_names: Set<s
         visit(name, root_dir, is_optional, root_manifest.name ?? "the plugin");
     }
 
-    // the package that loads a platform package has no binary itself (e.g. koffi 3 loading @koromix/koffi-<platform>),
-    // but it's what the plugin uses, so it counts as native too
+    // the package that loads a platform package (e.g. koffi 3 loading @koromix/koffi-<platform>) is the same on every platform itself,
+    // but which platform package it finds depends on where it was installed
     for (const record of packages.values()) {
-        const loads_platform_package = record.children.some((child_dir) => {
-            const child = packages.get(child_dir);
-            return child !== undefined && child.native && child.platform_specific;
-        });
+        const loads_platform_package = record.children.some((child_dir) => packages.get(child_dir)?.os_restricted);
 
-        if (loads_platform_package) {
-            record.native = true;
+        // says more than an install script, which the loader often has too
+        const has_weaker_reason = record.platform_reason === null || record.platform_reason.endsWith(" script");
+
+        if (loads_platform_package && has_weaker_reason) {
+            record.platform_reason = "loads a platform package";
         }
     }
 

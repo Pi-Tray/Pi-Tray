@@ -1,10 +1,10 @@
 // the platforms a plugin is built for, and the github runner that builds each one
-// native modules are built on their own platform, so every target needs a runner of that platform and cpu
+// platform-specific packages are installed on their own platform, so every target needs a runner of that platform and cpu
 
 export const ANY_TARGET = "any";
 
 /**
- * Every target a plugin with native modules is built for, unless its package.json lists its own "targets".
+ * Every target a platform-specific plugin is built for, unless its package.json lists its own "targets".
  */
 export const DEFAULT_TARGETS: readonly string[] = [
     "win32-x64",

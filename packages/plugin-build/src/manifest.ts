@@ -19,7 +19,7 @@ export interface ManifestOptions {
 
 /**
  * Combines the .json written next to each built archive into one manifest.json, which the installer reads to pick
- * the archive for its platform: targets["<platform>-<arch>"], or targets.any for a plugin without native modules.
+ * the archive for its platform: targets["<platform>-<arch>"], or targets.any for a plugin that's the same on every platform.
  * It also describes the release and its plugins, so a plugin browser can show them without downloading anything.
  * @param dist_dir the folder holding every target's archive and .json, e.g. after downloading every runner's artifact
  */

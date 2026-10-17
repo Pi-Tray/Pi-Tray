@@ -29,7 +29,7 @@ const string_list = (value: unknown, field: string): string[] => {
  * Reads the plugin's build settings from the "pi-tray" field of its package.json:
  * - entry: the file exporting the plugins, default src/index.ts (or the first of src/index.js, index.ts, index.js that exists)
  * - external: dependencies to leave out of the archive, e.g. optional ones a dependency only tries to load
- * - targets: the platforms to build for, if it has native modules, default every platform in targets.ts
+ * - targets: the platforms to build for, if anything depends on the platform, default every platform in targets.ts
  */
 export const read_plugin_config = (root_dir: string): PluginConfig => {
     const manifest_path = path.join(root_dir, "package.json");

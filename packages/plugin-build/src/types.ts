@@ -16,6 +16,7 @@ export interface PackageManifest {
     cpu?: string[];
     gypfile?: boolean;
     binary?: unknown;
+    scripts?: Record<string, string>;
     "pi-tray"?: unknown;
 }
 
@@ -29,11 +30,11 @@ export interface PackageRecord {
     /** Where npm installed it, e.g. <plugin>/node_modules/koffi */
     dir: string;
 
-    /** Whether it has a native module (or loads one from a platform package), so the plugin is built per platform */
-    native: boolean;
+    /** Why what's installed depends on the platform it was installed on, so the plugin is built per platform, or null if it doesn't */
+    platform_reason: string | null;
 
-    /** Whether it's for one platform only (it has "os" or "cpu"), e.g. @koromix/koffi-win32-x64 */
-    platform_specific: boolean;
+    /** Whether npm only installs it on some platforms (it has "os" or "cpu"), e.g. @koromix/koffi-win32-x64 */
+    os_restricted: boolean;
 
     /** The folders of the installed packages it depends on */
     children: string[];
@@ -108,7 +109,7 @@ export interface PluginManifest extends PackageMetadata {
     published_at: string;
     release_notes_url: string | null;
 
-    /** The targets with an archive, ["any"] for a plugin without native modules */
+    /** The targets with an archive, ["any"] for a plugin that's the same on every platform */
     platforms: string[];
 
     plugins: PluginInfo[] | null;
