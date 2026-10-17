@@ -1,7 +1,7 @@
 import {define_parser} from "../types";
 
-// accept both shorthand owner/repo@tag (tag is optional), as well as github repo url with or without .git
-const GITHUB_PATTERN = /^(?:https?:\/\/github\.com\/)?([^\/]+)\/([^\/]+)(?:\.git)?(?:@(.+))?$/;
+// owner/repo[@tag], or a github url to the repo or one of its release tags, with or without .git or a trailing slash
+const GITHUB_PATTERN = /^(?:https?:\/\/(?:www\.)?github\.com\/)?([^\/@\s]+)\/([^\/@\s]+?)(?:\.git)?(?:@([^\/@\s]+)|\/releases\/tag\/([^\/\s]+))?\/?$/i;
 
 export default define_parser({
     kind: "github",
@@ -11,9 +11,12 @@ export default define_parser({
     parse: (spec: string): {owner: string, repo: string, tag?: string} => {
         const match = spec.match(GITHUB_PATTERN);
         if (!match) {
-            throw new Error(`Invalid GitHub spec: ${spec}`);
+            throw new Error(`"${spec}" isn't a GitHub repo, use owner/repo, owner/repo@tag or a link to the repo or a release`);
         }
         const [, owner, repo, shorthand_tag, url_tag] = match;
+        if ([owner, repo].some((segment) => segment === "." || segment === "..")) {
+            throw new Error(`"${spec}" isn't a GitHub repo, the owner and repo can't be "." or ".."`);
+        }
         return {owner, repo, tag: shorthand_tag ?? url_tag};
     },
     format: ({owner, repo}) => `${owner}/${repo}`.toLowerCase()

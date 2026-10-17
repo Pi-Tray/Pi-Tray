@@ -67,7 +67,7 @@ export const parse_spec = (spec: string): ParseResult => {
         }
     }
 
-    return {ok: false, error: "Not a GitHub repo (owner/repo), a URL or a path to a .tgz"};
+    return {ok: false, error: "Not a recognised specifier"};
 }
 
 export const format_spec = (parsed: ParsedSpec): string => {
