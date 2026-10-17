@@ -10,9 +10,10 @@ name: Plugin release
 #     contents: write
 #   jobs:
 #     release:
-#       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-release.yml@plugin-build-v<version>
+#       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-release.yml@plugin-build-v<major>
 #
-# pin it to the same plugin-build-v tag as the plugin's @pi-tray/plugin-build, so the workflow and the tool it runs match
+# plugin-build-v<major> (e.g. plugin-build-v0) moves to each release of that major version of @pi-tray/plugin-build, so this
+# workflow has to keep working with any older tool of the same major version, which is what the plugin has installed
 #
 # every push builds each target as a check, a v<version> tag also publishes them as a release with manifest.json
 

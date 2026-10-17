@@ -6,7 +6,7 @@ import {parseArgs} from "util";
 
 import {build, plan} from "./build";
 import {write_manifest} from "./manifest";
-import {update, UpdateChange} from "./update";
+import {update, UpdateResult} from "./update";
 
 const USAGE = `Usage: pi-tray-plugin <command> [options]
 
@@ -14,7 +14,7 @@ Commands:
   plan                       Print the targets to build (as a github actions matrix) and the node version, as JSON
   build                      Build this machine's target into plugin-dist/
   manifest --base-url <url>  Combine the built archives in plugin-dist/ into manifest.json
-  update                     Update @pi-tray/types, @pi-tray/plugin-build and the workflows using them to their newest releases
+  update                     Update @pi-tray/types and @pi-tray/plugin-build to their newest releases of the same major version
 
 Options:
   --root <dir>               The plugin's folder (default: the current folder)
@@ -47,13 +47,16 @@ const root_dir = path.resolve(values.root);
 /**
  * Hands the update's result to the next steps of a github actions job, e.g. one that opens a pull request.
  */
-const write_github_outputs = (changes: UpdateChange[]) => {
+const write_github_outputs = ({changes, notes}: UpdateResult) => {
     const output_path = process.env.GITHUB_OUTPUT;
     if (!output_path) {
         return;
     }
 
-    const summary = changes.map((change) => `- ${change.what}: ${change.from} → ${change.to}`).join("\n");
+    const summary = [
+        ...changes.map((change) => `- ${change.what}: ${change.from} → ${change.to}`),
+        ...notes.map((note) => `- To do by hand: ${note}`)
+    ].join("\n");
     const delimiter = `summary_${randomUUID()}`;
 
     fs.appendFileSync(output_path, `changed=${changes.length > 0}\nsummary<<${delimiter}\n${summary}\n${delimiter}\n`);
@@ -85,19 +88,24 @@ const run = async () => {
         }
 
         case "update": {
-            const changes = await update(root_dir, {source_repo: values["source-repo"], github_token: process.env.GITHUB_TOKEN});
+            const result = await update(root_dir, {source_repo: values["source-repo"], github_token: process.env.GITHUB_TOKEN});
 
-            if (changes.length === 0) {
+            if (result.changes.length === 0) {
                 console.log("Already up to date");
             } else {
-                for (const change of changes) {
+                for (const change of result.changes) {
                     console.log(`${change.what}: ${change.from} -> ${change.to}`);
                 }
 
                 console.log("Run npm install to update package-lock.json");
             }
 
-            write_github_outputs(changes);
+            // shown as warnings on the run in github actions, as nothing else would surface them without a pull request
+            for (const note of result.notes) {
+                console.log(process.env.GITHUB_ACTIONS ? `::warning::${note}` : `To do by hand: ${note}`);
+            }
+
+            write_github_outputs(result);
             return;
         }
 

@@ -1,7 +1,8 @@
 name: Plugin tools update
 
 # called from a plugin's repo on a schedule, opening a pull request when there's a newer @pi-tray/types or
-# @pi-tray/plugin-build (it also moves the plugin's workflows to the matching plugin-build-v tag, including the one calling this):
+# @pi-tray/plugin-build of the same major version. the plugin's workflows call these shared ones at plugin-build-v<major>,
+# which moves with each release, so they're never changed (github doesn't let the workflow's token edit workflow files):
 #
 #   on:
 #     schedule:
@@ -12,7 +13,7 @@ name: Plugin tools update
 #     pull-requests: write
 #   jobs:
 #     update:
-#       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-update.yml@plugin-build-v<version>
+#       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-update.yml@plugin-build-v<major>
 #
 # the plugin's repo needs "Allow GitHub Actions to create and approve pull requests" on (Settings > Actions > General)
 
@@ -57,4 +58,5 @@ jobs:
             ${{ steps.update.outputs.summary }}
 
             Check the Pi-Tray release notes for anything that needs changing in the plugin, especially for a new @pi-tray/types version.
+            Anything listed as to do by hand is also shown as a warning on the workflow run.
           delete-branch: true

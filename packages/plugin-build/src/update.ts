@@ -26,6 +26,13 @@ export interface UpdateChange {
     to: string;
 }
 
+export interface UpdateResult {
+    changes: UpdateChange[];
+
+    /** Things the plugin's author has to do by hand, e.g. move to a new major version */
+    notes: string[];
+}
+
 export interface UpdateOptions {
     /** The repo the tools are released from, default Pi-Tray/Pi-Tray */
     source_repo?: string;
@@ -63,8 +70,9 @@ const fetch_releases = async (source_repo: string, github_token: string | undefi
 /**
  * The newest release of a tool, and its tarball's url.<br>
  * Pre-releases (e.g. 0.1.0-alpha) are only picked while the plugin is already on one, so a plugin on a stable version stays on stable ones.
+ * @param major only consider this major version, or any if null
  */
-const newest_release = (releases: GithubRelease[], tag_prefix: string, current_version: string | null) => {
+const newest_release = (releases: GithubRelease[], tag_prefix: string, current_version: string | null, major: number | null) => {
     const allow_prereleases = current_version === null || semver.prerelease(current_version) !== null;
     const tag_start = `${tag_prefix}-v`;
 
@@ -73,6 +81,7 @@ const newest_release = (releases: GithubRelease[], tag_prefix: string, current_v
         .map((release) => ({release, version: semver.valid(release.tag_name.slice(tag_start.length))}))
         .filter((candidate): candidate is {release: GithubRelease, version: string} => candidate.version !== null)
         .filter((candidate) => allow_prereleases || semver.prerelease(candidate.version) === null)
+        .filter((candidate) => major === null || semver.major(candidate.version) === major)
         .sort((first, second) => semver.rcompare(first.version, second.version));
 
     for (const {release, version} of candidates) {
@@ -98,83 +107,103 @@ const write_json_like = (file_path: string, original_text: string, value: unknow
     fs.writeFileSync(file_path, JSON.stringify(value, null, indent) + (original_text.endsWith("\n") ? "\n" : ""));
 }
 
+// a workflow line calling one of the shared workflows, e.g. Pi-Tray/Pi-Tray/.github/workflows/plugin-release.yml@plugin-build-v0
+const shared_workflow_refs = (workflow_text: string, source_repo: string): string[] => {
+    const pattern = new RegExp(`${source_repo.replace("/", "\\/")}\\/\\.github\\/workflows\\/[\\w.-]+@([\\w.+-]+)`, "g");
+    return [...workflow_text.matchAll(pattern)].map((match) => match[1]);
+}
+
 /**
- * Updates a plugin to the newest @pi-tray/types and @pi-tray/plugin-build:
- * the tarball urls in its package.json, and the plugin-build-v tag its workflows call the shared workflows with.<br>
- * Doesn't touch package-lock.json, run npm install afterwards.
- * @returns what changed, empty if it was already up to date
+ * Checks the plugin's workflows call the shared workflows at the moving tag for its tool's major version, e.g. @plugin-build-v0.
+ * Workflow files can't be changed by the update workflow (github doesn't let its token edit them), so this only says what to change.
  */
-export const update = async (root_dir: string, options: UpdateOptions = {}): Promise<UpdateChange[]> => {
+const check_workflow_refs = (root_dir: string, source_repo: string, tool_major: number | null): string[] => {
+    const workflows_dir = path.join(root_dir, ".github", "workflows");
+    const notes: string[] = [];
+
+    if (tool_major === null || !fs.existsSync(workflows_dir)) {
+        return notes;
+    }
+
+    const expected_ref = `plugin-build-v${tool_major}`;
+
+    for (const file_name of fs.readdirSync(workflows_dir)) {
+        if (!/\.ya?ml$/.test(file_name)) {
+            continue;
+        }
+
+        const workflow_text = fs.readFileSync(path.join(workflows_dir, file_name), "utf-8");
+
+        for (const ref of new Set(shared_workflow_refs(workflow_text, source_repo))) {
+            if (ref !== expected_ref) {
+                notes.push(`.github/workflows/${file_name} calls the shared workflows at @${ref}, change it to @${expected_ref} by hand`);
+            }
+        }
+    }
+
+    return notes;
+}
+
+/**
+ * Updates a plugin to the newest @pi-tray/types and @pi-tray/plugin-build within their current major versions,
+ * by changing the tarball urls in its package.json. Doesn't touch package-lock.json, run npm install afterwards.<br>
+ * The plugin's workflows call the shared workflows at a tag that moves with each release of the same major version
+ * (e.g. @plugin-build-v0), so they never need changing for an update, only for a new major version.
+ * @returns what changed (empty if it was already up to date), and anything to do by hand
+ */
+export const update = async (root_dir: string, options: UpdateOptions = {}): Promise<UpdateResult> => {
     const source_repo = options.source_repo ?? DEFAULT_SOURCE_REPO;
     const releases = await fetch_releases(source_repo, options.github_token);
     const changes: UpdateChange[] = [];
+    const notes: string[] = [];
 
     const manifest_path = path.join(root_dir, "package.json");
     const manifest_text = fs.readFileSync(manifest_path, "utf-8");
     const manifest = JSON.parse(manifest_text);
 
-    let newest_plugin_build_tag: string | null = null;
+    let tool_major: number | null = null;
 
     for (const tool of TOOLS) {
         const section = ["devDependencies", "dependencies"].find((name) => manifest[name]?.[tool.package_name] !== undefined);
         const current_url: string | undefined = section ? manifest[section][tool.package_name] : undefined;
         const current_version = current_url ? version_in_url(current_url, tool.tag_prefix) : null;
 
-        const newest = newest_release(releases, tool.tag_prefix, current_version);
-        if (!newest) {
-            console.warn(`No ${tool.tag_prefix}-v release with a tarball in ${source_repo}`);
-            continue;
-        }
-
-        if (tool.tag_prefix === "plugin-build") {
-            newest_plugin_build_tag = newest.tag;
-        }
-
         if (!section || !current_url) {
             console.warn(`${tool.package_name} isn't a dependency, skipping it`);
             continue;
         }
 
-        if (current_version && semver.valid(current_version) && !semver.gt(newest.version, current_version)) {
+        if (!current_version || !semver.valid(current_version)) {
+            notes.push(`${tool.package_name} isn't a ${source_repo} release tarball (${current_url}), so it can't be updated`);
+            continue;
+        }
+
+        // a new major version can break things, so it's only ever moved to by hand
+        const current_major = semver.major(current_version);
+        const newest = newest_release(releases, tool.tag_prefix, current_version, current_major);
+        const newest_any_major = newest_release(releases, tool.tag_prefix, current_version, null);
+
+        if (newest_any_major && semver.major(newest_any_major.version) > current_major) {
+            notes.push(`${tool.package_name} ${newest_any_major.version} is out, a new major version, which has to be moved to by hand`);
+        }
+
+        if (tool.tag_prefix === "plugin-build") {
+            tool_major = current_major;
+        }
+
+        if (!newest || !semver.gt(newest.version, current_version)) {
             continue;
         }
 
         manifest[section][tool.package_name] = newest.url;
-        changes.push({what: tool.package_name, from: current_version ?? current_url, to: newest.version});
+        changes.push({what: tool.package_name, from: current_version, to: newest.version});
     }
 
     if (changes.length > 0) {
         write_json_like(manifest_path, manifest_text, manifest);
     }
 
-    // the shared workflows are pinned to a plugin-build-v tag, so they move with the tool
-    const workflows_dir = path.join(root_dir, ".github", "workflows");
-    const workflow_ref = new RegExp(`(${source_repo.replace("/", "\\/")}\\/\\.github\\/workflows\\/[\\w.-]+@)(plugin-build-v[\\w.+-]+)`, "g");
+    notes.push(...check_workflow_refs(root_dir, source_repo, tool_major));
 
-    if (newest_plugin_build_tag && fs.existsSync(workflows_dir)) {
-        for (const file_name of fs.readdirSync(workflows_dir)) {
-            if (!/\.ya?ml$/.test(file_name)) {
-                continue;
-            }
-
-            const workflow_path = path.join(workflows_dir, file_name);
-            const workflow_text = fs.readFileSync(workflow_path, "utf-8");
-            const old_tags = new Set<string>();
-
-            const updated_text = workflow_text.replace(workflow_ref, (_whole, prefix: string, old_tag: string) => {
-                if (old_tag !== newest_plugin_build_tag) {
-                    old_tags.add(old_tag);
-                }
-
-                return prefix + newest_plugin_build_tag;
-            });
-
-            if (updated_text !== workflow_text) {
-                fs.writeFileSync(workflow_path, updated_text);
-                changes.push({what: `.github/workflows/${file_name}`, from: [...old_tags].join(", "), to: newest_plugin_build_tag});
-            }
-        }
-    }
-
-    return changes;
+    return {changes, notes};
 }

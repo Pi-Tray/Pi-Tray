@@ -19,9 +19,9 @@ Builds a Pi-Tray plugin into archives the server can load, one per platform when
      contents: write
    jobs:
      release:
-       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-release.yml@plugin-build-v<version>
+       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-release.yml@plugin-build-v<major>
    ```
-   Use the same version as the plugin-build tarball, so the workflow matches the tool it runs.
+   Use the major version of the plugin-build tarball, e.g. `@plugin-build-v0` for 0.1.0. That tag moves to each release of the major version, so the workflow never needs changing until a new major version.
 3. Push a `v<version>` tag matching package.json to publish a release.
 4. Optionally keep the tools up to date with `.github/workflows/update.yml`, which opens a pull request when there's a newer version:
    ```yaml
@@ -34,7 +34,7 @@ Builds a Pi-Tray plugin into archives the server can load, one per platform when
      pull-requests: write
    jobs:
      update:
-       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-update.yml@plugin-build-v<version>
+       uses: Pi-Tray/Pi-Tray/.github/workflows/plugin-update.yml@plugin-build-v<major>
    ```
    This needs "Allow GitHub Actions to create and approve pull requests" on, in the repo's Settings > Actions > General.
 
@@ -78,4 +78,4 @@ In package.json, all optional:
 - `pi-tray-plugin plan`: the targets to build, as a GitHub Actions matrix, and the Node version to build them with
 - `pi-tray-plugin build [--target <target>] [--skip-verify]`: builds this machine's target into `plugin-dist/`, then loads it to check every plugin
 - `pi-tray-plugin manifest --base-url <url> [--release-notes-url <url>] [--repository-url <url>]`: combines the archives in `plugin-dist/` into `manifest.json`
-- `pi-tray-plugin update`: moves the `@pi-tray/types` and `@pi-tray/plugin-build` tarball urls in package.json, and the `plugin-build-v` tag the workflows use, to the newest releases. Pre-releases are only picked while already on one. Run `npm install` after
+- `pi-tray-plugin update`: moves the `@pi-tray/types` and `@pi-tray/plugin-build` tarball urls in package.json to their newest releases of the same major version. Pre-releases are only picked while already on one. A new major version, or a workflow not calling the shared workflows at `@plugin-build-v<major>`, is reported to change by hand. Run `npm install` after

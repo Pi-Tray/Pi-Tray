@@ -47,3 +47,12 @@ jobs:
             --title "${{ github.ref_name }}" \
             --notes "Install in a plugin with: npm install -D https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/$tarball" \
             --latest=false
+
+      # plugins call the shared plugin workflows at plugin-build-v<major>, which follows the newest release of that major version,
+      # so every release of it has to keep working with plugins still on older tools of the same major version
+      - name: Move the major version tag
+        working-directory: packages/plugin-build
+        run: |
+          major=$(node -p "require('./package.json').version.split('.')[0]")
+          git tag --force "plugin-build-v$major" "$GITHUB_SHA"
+          git push --force origin "refs/tags/plugin-build-v$major"
