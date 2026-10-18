@@ -5,6 +5,7 @@ import {Link} from "wouter";
 import {SupervisorControl, useSupervisor} from "../contexts/SupervisorProvider";
 import {useAutostart} from "../util/autostart";
 import {ServerConfigForm} from "../components/ServerConfigForm.tsx";
+import {show_confirm} from "../util/dialogs.ts";
 
 interface ServerSummary {
     text: string;
@@ -122,12 +123,19 @@ export const ServerPage = () => {
         }
     }
 
-    const confirm_stop = () => {
+    const confirm_stop = async () => {
         const comes_back = autostart.enabled
             ? "It starts again automatically when you log in, or you can start it here at any time."
             : "You can start it again here at any time.";
 
-        if (confirm(`Stop Pi-Tray?\n\nYour Pi will disconnect and its buttons won't do anything until Pi-Tray is started again. ${comes_back}`)) {
+        const confirmed = await show_confirm({
+            title: "Stop Pi-Tray?",
+            message: `Your Pi will disconnect and its buttons won't do anything until Pi-Tray is started again. ${comes_back}`,
+            confirm_label: "Stop",
+            tone: "danger"
+        });
+
+        if (confirmed) {
             void run(supervisor.stop);
         }
     }

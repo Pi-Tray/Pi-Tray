@@ -1,4 +1,5 @@
 import {install_package, resolve_package} from "./plugins";
+import {show_confirm} from "./dialogs";
 
 /**
  * Shows what a spec would install and installs it if the user agrees, including replacing a package from somewhere else.
@@ -18,7 +19,13 @@ export const confirm_and_install = async (spec: string): Promise<boolean> => {
         resolved.conflict ? `\nThis replaces ${resolved.name}${resolved.installed ? ` ${resolved.installed.version}` : ""}, installed from ${resolved.installed?.source ?? "somewhere Pi-Tray didn't record"}.` : null
     ].filter((line) => line !== null).join("\n");
 
-    if (!confirm(`Install this package?\n\n${details}`)) {
+    const confirmed = await show_confirm({
+        title: "Install this package?",
+        message: details,
+        confirm_label: "Install"
+    });
+
+    if (!confirmed) {
         return false;
     }
 

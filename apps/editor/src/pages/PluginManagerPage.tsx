@@ -1,6 +1,7 @@
 import {useState} from "react";
 
 import {confirm_and_install} from "../util/install_flow";
+import {show_alert} from "../util/dialogs";
 import {PluginTable} from "../components/PluginTable";
 import {parse_spec} from "@pi-tray/package-spec";
 
@@ -24,7 +25,7 @@ export const PluginManagerPage = () => {
                     const parsed = parse_spec(spec);
 
                     if (!parsed.ok) {
-                        alert(parsed.error);
+                        show_alert(parsed.error);
                         return;
                     }
 
@@ -32,10 +33,10 @@ export const PluginManagerPage = () => {
 
                     try {
                         if (await confirm_and_install(spec)) {
-                            alert("Package installed.");
+                            show_alert("Package installed.");
                         }
                     } catch (error) {
-                        alert(`Couldn't install the package: ${error instanceof Error ? error.message : String(error)}`);
+                        show_alert(`Couldn't install the package: ${error instanceof Error ? error.message : String(error)}`);
                     }
 
                     setInstalling(false);

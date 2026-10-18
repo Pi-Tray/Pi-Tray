@@ -1,6 +1,7 @@
 import {ChevronRight} from "lucide-react";
 
 import {PackagePlugins, remove_package, usePluginIndex} from "../util/plugins.ts";
+import {show_alert, show_confirm} from "../util/dialogs.ts";
 
 interface TableRowProps {
     package_plugins: PackagePlugins;
@@ -15,14 +16,20 @@ const TableRow = ({package_plugins}: TableRowProps) => {
                 <div className="font-medium leading-5">{package_plugins.package_name}</div>
                 <div className="text-xs opacity-60">{package_plugins.installed.version} · {package_plugins.installed.source}</div>
                 <button className="btn btn-ghost btn-xs mt-1" onClick={async () => {
-                    if (!confirm(`Remove ${package_plugins.package_name}? Its saved data is kept, so reinstalling it keeps its settings.`)) {
+                    const confirmed = await show_confirm({
+                        title: "Remove package",
+                        message: `Remove ${package_plugins.package_name}? Its saved data is kept, so reinstalling it keeps its settings.`,
+                        confirm_label: "Remove",
+                        tone: "danger"
+                    });
+                    if (!confirmed) {
                         return;
                     }
 
                     try {
                         await remove_package(package_plugins.package_name);
                     } catch (error) {
-                        alert(`Couldn't remove it: ${error instanceof Error ? error.message : String(error)}`);
+                        show_alert(`Couldn't remove it: ${error instanceof Error ? error.message : String(error)}`);
                     }
                 }}>Remove</button>
 

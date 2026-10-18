@@ -12,6 +12,7 @@ import {CustomDynamicIcon} from "../components/CustomDynamicIcon.tsx";
 import {AssetPickerDialog} from "../components/AssetPickerDialog.tsx";
 import {PluginPickerDialog} from "../components/PluginPickerDialog.tsx";
 import {useLiveOverlayConnection} from "../util/live_overlay.ts";
+import {show_alert} from "../util/dialogs.ts";
 
 interface SidebarContentProps {
     coords: {x: number, y: number};
@@ -210,7 +211,7 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
             }
 
             if (!plugin) {
-                alert("No plugin configured for this button.");
+                show_alert("No plugin configured for this button.");
                 return;
             }
 
@@ -223,7 +224,7 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
                     }
                 });
             } else {
-                alert("Not connected to the server.");
+                show_alert("Not connected to the server.");
             }
         },
         [cell, plugin, channel, coords]

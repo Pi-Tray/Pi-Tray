@@ -4,6 +4,7 @@ import {PairedDeviceInfo} from "@pi-tray/types";
 import {Clock, KeyRound, MonitorSmartphone, Plus, RefreshCw, RotateCcw, Trash2} from "lucide-react";
 import {Link} from "wouter";
 import {CustomDynamicIcon} from "../components/CustomDynamicIcon.tsx";
+import {show_confirm} from "../util/dialogs.ts";
 
 const format_date = (date: string | number | Date) =>
     new Date(date).toLocaleString(undefined, {dateStyle: "medium", timeStyle: "short"});
@@ -15,10 +16,16 @@ const PairedDevice = ({device}: {device: PairedDeviceInfo}) => {
     const channel = useChannel();
 
     const revoke = useCallback(
-        () => {
+        async () => {
             if (!channel) return;
 
-            if (!window.confirm(`Are you sure you want to unpair and immediately disconnect ${device.name}?`)) {
+            const confirmed = await show_confirm({
+                title: "Revoke device",
+                message: `Are you sure you want to unpair and immediately disconnect ${device.name}?`,
+                confirm_label: "Revoke",
+                tone: "danger"
+            });
+            if (!confirmed) {
                 return;
             }
 

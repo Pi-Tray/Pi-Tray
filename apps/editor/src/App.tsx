@@ -10,6 +10,7 @@ import {useConfigValue} from "./util/config";
 import {AnimatedRouter} from "./components/AnimatedRouter";
 import {LeftNav} from "./components/LeftNav";
 import {StatusToast} from "./components/StatusToast";
+import {DialogHost} from "./components/DialogHost";
 
 import {routes} from "./routes";
 import {NotFound} from "./pages/NotFound";
@@ -18,6 +19,7 @@ import {onOpenUrl} from "@tauri-apps/plugin-deep-link";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {AutostartPrompt} from "./components/AutostartPrompt";
 import {confirm_and_install} from "./util/install_flow";
+import {show_alert} from "./util/dialogs";
 import {parse_spec} from "@pi-tray/package-spec";
 import {SupervisorProvider} from "./contexts/SupervisorProvider.tsx";
 
@@ -78,22 +80,21 @@ const App = () => {
                     const parsed = spec ? parse_spec(spec) : null;
 
                     if (!spec || !parsed || !parsed.ok) {
-                        alert(`This link doesn't say what to install${parsed && !parsed.ok ? `: ${parsed.error}` : ""}`);
+                        show_alert(`This link doesn't say what to install${parsed && !parsed.ok ? `: ${parsed.error}` : ""}`);
                         break;
                     }
 
                     if (parsed.source.kind === "file") {
-                        alert("Links can't install files from your computer, install it from the plugin manager instead.");
+                        show_alert("Links can't install files from your computer, install it from the plugin manager instead.");
                         break;
                     }
 
-                    // TODO: use proper toasts
                     try {
                         if (await confirm_and_install(spec)) {
-                            alert("Package installed.");
+                            show_alert("Package installed.");
                         }
                     } catch (error) {
-                        alert(`Couldn't install the package: ${error instanceof Error ? error.message : String(error)}`);
+                        show_alert(`Couldn't install the package: ${error instanceof Error ? error.message : String(error)}`);
                     }
 
                     break;
@@ -140,6 +141,8 @@ const App = () => {
 
                     {/* use a key to force remounting the component when the websocket url changes to reset its internal state */}
                     <StatusToast key={`status-${ws_url}`} />
+
+                    <DialogHost />
                 </div>
             </ConditionalWSProvider>
         </SupervisorProvider>

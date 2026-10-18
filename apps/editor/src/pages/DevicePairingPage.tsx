@@ -3,6 +3,7 @@ import {useCallback, useEffect, useState} from "react";
 import {Plus} from "lucide-react";
 import {Link, useLocation} from "wouter";
 import {useChannel} from "../contexts/WSProvider.tsx";
+import {show_alert, show_confirm} from "../util/dialogs.ts";
 import {format_code, PAIRING_CODE_LENGTH} from "@pi-tray/secure-channel";
 
 export const DevicePairingPage = () => {
@@ -11,7 +12,7 @@ export const DevicePairingPage = () => {
 
     const channel = useChannel();
     const pair_device = useCallback(
-        () => {
+        async () => {
             if (!channel) return;
 
             if (code.length !== PAIRING_CODE_LENGTH) {
@@ -19,7 +20,11 @@ export const DevicePairingPage = () => {
                 return;
             }
 
-            const confirmation = confirm(`Are you sure you want to pair with the device using code ${format_code(code)}?`);
+            const confirmation = await show_confirm({
+                title: "Pair device",
+                message: `Are you sure you want to pair with the device using code ${format_code(code)}?`,
+                confirm_label: "Pair"
+            });
             if (!confirmation) {
                 return;
             }
@@ -48,7 +53,7 @@ export const DevicePairingPage = () => {
                 } else if (msg.payload === "no_match") {
                     setInvalidCode(true);
                 } else if (msg.payload === "collided") {
-                    alert("Multiple devices are showing that code! Please try again shortly.");
+                    show_alert("Multiple devices are showing that code! Please try again shortly.");
                     setCode("");
                     setName("");
                 }
