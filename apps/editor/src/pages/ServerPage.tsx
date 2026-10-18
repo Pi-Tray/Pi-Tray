@@ -21,7 +21,7 @@ export const ServerPage = () => {
                 <div className={`${is_pending ? "bg-gray-500" : (is_running ? "bg-success" : "bg-error")} p-4 rounded-full w-2 h-2 flex items-center justify-center text-white`}>
                     {is_pending ? <Ellipsis className="min-w-4 h-4" /> : (is_running ? <Check className="min-w-4 h-4" /> : <X className="min-w-4 h-4" />)}
                 </div>
-                <span>{is_pending ? "Applying action..." : (is_running ? "The server is running!" : "The server is not running.")}</span>
+                <span>{is_pending ? `Applying ${supervisor.pending_action} action...` : (is_running ? "The server is running!" : "The server is not running.")}</span>
             </div>
 
             <div className="flex flex-col gap-4">
