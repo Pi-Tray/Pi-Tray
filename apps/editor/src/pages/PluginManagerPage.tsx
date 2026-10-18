@@ -1,11 +1,14 @@
 import {useState} from "react";
 
-import {install_package} from "../util/plugins";
-import {PluginTable} from "../components/PluginTable.tsx";
+import {confirm_and_install} from "../util/install_flow";
+import {PluginTable} from "../components/PluginTable";
+import {parse_spec} from "@pi-tray/package-spec";
 
 export const PluginManagerPage = () => {
     const [pkg_name_input, setPkgNameInput] = useState("");
     const [installing, setInstalling] = useState(false);
+
+    const spec_check = pkg_name_input.trim() ? parse_spec(pkg_name_input) : null;
 
     return (
         <>
@@ -15,27 +18,24 @@ export const PluginManagerPage = () => {
             <p className="text-xs opacity-60">Tip: use the <i>Express Install</i> button online to automatically open the editor and install the package!</p>
 
             <div className="flex gap-2 mt-4 mb-10">
-                <input type="text" disabled={installing} value={pkg_name_input} onChange={(e) => setPkgNameInput(e.target.value)} placeholder="Package name or git URL" className="border p-2 rounded w-full" />
+                <input type="text" disabled={installing} value={pkg_name_input} onChange={(e) => setPkgNameInput(e.target.value)} placeholder="owner/repo, a link, or a path to a .tgz" className="border p-2 rounded w-full" />
                 <button className="btn btn-primary" disabled={installing} onClick={async () => {
-                    // TODO: make this proper and secure, this is just a test
+                    const spec = pkg_name_input.trim();
+                    const parsed = parse_spec(spec);
 
-                    if (pkg_name_input.trim() === "") {
-                        alert("Please enter a package name or git URL.");
-                        return;
-                    }
-
-                    if (!confirm("This is a test, and if you don't know what this is, you should cancel now.")) {
+                    if (!parsed.ok) {
+                        alert(parsed.error);
                         return;
                     }
 
                     setInstalling(true);
 
                     try {
-                        await install_package(pkg_name_input.trim());
-                        alert("Package installed successfully.");
+                        if (await confirm_and_install(spec)) {
+                            alert("Package installed.");
+                        }
                     } catch (error) {
-                        console.error("Error installing package:", error);
-                        alert("Failed to install package. Check the console for details.");
+                        alert(`Couldn't install the package: ${error instanceof Error ? error.message : String(error)}`);
                     }
 
                     setInstalling(false);
@@ -43,6 +43,7 @@ export const PluginManagerPage = () => {
                     {installing ? "..." : "Install"}
                 </button>
             </div>
+            {spec_check && !spec_check.ok && <p className="text-xs text-warning -mt-8 mb-10">{spec_check.error}</p>}
 
             <PluginTable />
         </>

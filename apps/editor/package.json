@@ -14,9 +14,10 @@
     },
     "dependencies": {
         "@pi-tray/ui": "workspace:*",
-        "@fontsource-variable/dm-sans": "^5.2.6",
         "@pi-tray/types": "workspace:*",
         "@pi-tray/secure-channel": "workspace:*",
+        "@pi-tray/package-spec": "workspace:*",
+        "@fontsource-variable/dm-sans": "^5.2.6",
         "@tailwindcss/vite": "^4.1.11",
         "@tauri-apps/api": "^2.7.0",
         "@tauri-apps/plugin-deep-link": "^2.4.10",

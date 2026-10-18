@@ -1,49 +1,132 @@
 import {useEffect, useMemo, useState} from "react";
 
-import {exists, mkdir, readDir, watch} from "@tauri-apps/plugin-fs";
+import {mkdir, watch} from "@tauri-apps/plugin-fs";
 import {Command} from "@tauri-apps/plugin-shell";
 
 import type {PluginConfigTemplate, PluginLiveControllable} from "@pi-tray/types";
 
 import {plugin_dir} from "./paths";
-import {join} from "@tauri-apps/api/path";
+
+// the package manager's results, as "pi-tray package ..." prints them. written out here rather than imported from
+// @pi-tray/installer, which is node code the webview can't load
+
+export interface InstalledPackage {
+    name: string;
+    version: string;
+
+    /** Where it was installed from, e.g. github:pi-tray/ghost-plugins, url:https://… or file:/path/to/archive.tgz */
+    source: string;
+
+    target: string;
+    pinned: boolean;
+    installed_at: string;
+}
+
+export interface ResolvedPackage {
+    name: string;
+    version: string;
+    description: string | null;
+    source: string;
+
+    /** From the Pi-Tray org. Anything else should be confirmed by the user before installing */
+    trusted: boolean;
+
+    pinned: boolean;
+    target: string;
+
+    /** The plugins it exports, or null if the release doesn't list them */
+    plugins: string[] | null;
+
+    /** The release's manifest (author, license, repository, homepage, plugin details), or null for a local archive */
+    manifest: Record<string, unknown> | null;
+
+    /** What's installed under the same name, if anything */
+    installed: Omit<InstalledPackage, "name"> | null;
+
+    /** Installing it would replace a package from somewhere else, so ask first and install with replace */
+    conflict: boolean;
+}
+
+export type InstallResult =
+    | {status: "installed", name: string, version: string, previous_version: string | null, resolved: ResolvedPackage}
+    | {status: "conflict", name: string, installed_source: string | null, new_source: string, resolved: ResolvedPackage};
+
+export interface RemoveResult {
+    name: string;
+    version: string | null;
+    purged: boolean;
+}
+
+// what "package install" exits with when it found a package of the same name from another source
+const EXIT_CONFLICT = 2;
 
 /**
- * Lists the installed packages from the plugin folder, one folder per package, with scoped ones (@scope/name) one level down.
- * @returns array of installed package names
+ * Runs a pi-tray package command and parses its JSON result.
+ * @param command_args the command and its arguments, e.g. ["install", "Pi-Tray/ghost-plugins"]
+ * @throws with the package manager's error message if it failed
  */
-export const list_installed_packages = async (): Promise<string[]> => {
-    if (!await exists(plugin_dir)) {
-        return [];
-    }
+const run_package_command = async <Result>(command_args: string[]): Promise<Result> => {
+    const output = await Command.sidecar("binaries/pi-tray", ["package", ...command_args]).execute();
 
-    const package_names: string[] = [];
+    if (output.code !== 0 && output.code !== EXIT_CONFLICT) {
+        let message = output.stderr.trim() || `pi-tray package ${command_args[0]} exited with ${output.code}`;
 
-    for (const entry of await readDir(plugin_dir)) {
-        // skips .tmp and .pending
-        if (!entry.isDirectory || entry.name.startsWith(".")) {
-            continue;
-        }
-
-        if (entry.name.startsWith("@")) {
-            for (const scoped_entry of await readDir(await join(plugin_dir, entry.name))) {
-                if (scoped_entry.isDirectory) {
-                    package_names.push(`${entry.name}/${scoped_entry.name}`);
-                }
+        // errors are {"error": "..."}, apart from info's, which are plain text
+        try {
+            const parsed = JSON.parse(message) as {error?: unknown};
+            if (typeof parsed.error === "string") {
+                message = parsed.error;
             }
-        } else {
-            package_names.push(entry.name);
+        } catch {
+            // not JSON, use it as it is
         }
+
+        throw new Error(message);
     }
 
-    return package_names.sort();
+    return JSON.parse(output.stdout.trim()) as Result;
+}
+
+/**
+ * Lists the installed packages, as the package manager recorded them.
+ * @returns the installed packages, sorted by name
+ */
+export const list_installed_packages = (): Promise<InstalledPackage[]> => run_package_command(["list"]);
+
+/**
+ * Works out what installing a spec would install without changing anything, so it can be shown to the user first:
+ * its name, version and plugins, whether it's trusted, and whether it would replace a package from somewhere else.
+ * @param spec what the user typed: owner/repo, owner/repo@tag, a GitHub or manifest link, or a path to a .tgz
+ * @throws if it can't be installed, e.g. no release, not built for this platform, or a reserved name
+ */
+export const resolve_package = (spec: string): Promise<ResolvedPackage> => run_package_command(["resolve", spec]);
+
+/**
+ * Installs a package. A package of the same name from a different source is only replaced with replace set,
+ * otherwise the result is a conflict, so the user can be asked first.
+ * @param spec the same spec given to {@link resolve_package}
+ * @param replace replace a package of the same name from a different source
+ * @throws if it can't be installed, or the download or extraction fails
+ */
+export const install_package = (spec: string, replace = false): Promise<InstallResult> => {
+    return run_package_command(["install", spec, ...(replace ? ["--replace"] : [])]);
+}
+
+/**
+ * Removes an installed package.
+ * @param package_name e.g. @pi-tray/discord
+ * @param purge also delete the package's data folder, e.g. saved logins
+ * @throws if it isn't installed, or it's in use (windows, while the server has its native modules loaded)
+ */
+export const remove_package = (package_name: string, purge = false): Promise<RemoveResult> => {
+    return run_package_command(["remove", package_name, ...(purge ? ["--purge"] : [])]);
 }
 
 const change_listeners = new Set<() => void>();
 
 /**
  * Subscribe to changes in the list of installed packages.<br>
- * This will notify the callback whenever plugin-env's `package.json` file changes, indicating a change in the installed packages.
+ * This will notify the callback whenever the package manager installs or removes a package.
  * @param callback the callback to call when the list of installed packages changes
  */
 export const subscribe_to_package_list_change = (callback: () => void): void => {
@@ -68,12 +151,12 @@ const notify_package_list_change = (): void => {
 export const clear_plugin_info_cache = () => plugin_info_cache.clear();
 
 /**
- * A React hook that provides the list of installed packages in plugin-env.
+ * A React hook that provides the installed packages.
  * @param set_null_when_reindexing whether to set the package list to null while reindexing (default: true)
- * @returns array of installed plugin package names or null if not yet loaded
+ * @returns the installed packages, or null if not yet loaded
  */
 export const usePackageList = (set_null_when_reindexing = true) => {
-    const [packages, setPackages] = useState<string[] | null>(null);
+    const [packages, setPackages] = useState<InstalledPackage[] | null>(null);
 
     useEffect(() => {
         const fetch_packages = async () => {
@@ -81,7 +164,12 @@ export const usePackageList = (set_null_when_reindexing = true) => {
                 setPackages(null);
             }
 
-            setPackages(await list_installed_packages());
+            try {
+                setPackages(await list_installed_packages());
+            } catch (error) {
+                console.error("Failed to list installed packages:", error);
+                setPackages([]);
+            }
         };
 
         fetch_packages();
@@ -95,14 +183,6 @@ export const usePackageList = (set_null_when_reindexing = true) => {
     }, []);
 
     return packages;
-}
-
-/**
- * Installs a package in the plugins directory.
- * @param package_ref the package reference to install, such as a name or git url
- */
-export const install_package = async (package_ref: string) => {
-   throw new Error("not yet implemented for new package system");
 }
 
 export interface PluginInfo {
@@ -134,20 +214,13 @@ const get_package_plugin_info = (package_name: string): Promise<Record<string, P
         return cached_info;
     }
 
-    const info_promise = (async () => {
-        const command = Command.sidecar("binaries/pi-tray", ["package", "info", package_name]);
-        const result = await command.execute();
-
-        if (result.code !== 0) {
-            console.error("Failed to get plugin info for package:", package_name, result);
-            throw new Error(`Failed to get plugin info for package: ${package_name}`);
-        }
-
-        return JSON.parse(result.stdout.trim()) as Record<string, PluginInfo>;
-    })();
+    const info_promise = run_package_command<Record<string, PluginInfo>>(["info", package_name]);
 
     // don't cache failures, so the next call retries
-    info_promise.catch(() => plugin_info_cache.delete(package_name));
+    info_promise.catch((error) => {
+        console.error("Failed to get plugin info for package:", package_name, error);
+        plugin_info_cache.delete(package_name);
+    });
 
     plugin_info_cache.set(package_name, info_promise);
     return info_promise;
@@ -239,6 +312,12 @@ export interface IndexedPlugin {
 
 export interface PackagePlugins {
     package_name: string;
+
+    /**
+     * Its version and where it was installed from.
+     */
+    installed: InstalledPackage;
+
     plugins: IndexedPlugin[];
 
     /**
@@ -250,7 +329,7 @@ export interface PackagePlugins {
 /**
  * A React hook that indexes the plugins contributed by every installed package.<br>
  * Shares the plugin info cache, so each package only starts pi-tray CLI once until the installed packages change.
- * @returns each package with its plugins, in package.json order, or null until the first index completes
+ * @returns each package with its plugins, sorted by package name, or null until the first index completes
  */
 export const usePluginIndex = () => {
     // keep showing the previous index while reindexing rather than flashing empty
@@ -265,12 +344,15 @@ export const usePluginIndex = () => {
         // ignore results that arrive after the package list has changed again
         let superseded = false;
 
-        Promise.all(packages.map(async (package_name): Promise<PackagePlugins> => {
+        Promise.all(packages.map(async (installed): Promise<PackagePlugins> => {
+            const package_name = installed.name;
+
             try {
                 const package_info = await get_package_plugin_info(package_name);
 
                 return {
                     package_name,
+                    installed,
                     plugins: Object.entries(package_info).map(([plugin_key, info]) => ({
                         name: `${package_name}/${plugin_key}`,
                         display_name: info.display_name || plugin_key,
@@ -281,7 +363,7 @@ export const usePluginIndex = () => {
                     }))
                 };
             } catch (error) {
-                return {package_name, plugins: [], error: error instanceof Error ? error.message : String(error)};
+                return {package_name, installed, plugins: [], error: error instanceof Error ? error.message : String(error)};
             }
         })).then(new_index => {
             if (!superseded) {
@@ -313,10 +395,14 @@ export const usePluginList = () => {
 // shared with the server, re-exported so the editor's existing imports keep working
 export {unwrap_plugin_reference} from "@pi-tray/types";
 
-// installing or removing a package adds or removes its folder. recursive, as scoped packages are a folder deeper
-// TODO: watch the installer's .installed.json (installed_file) instead, so downloads in .tmp don't trigger it
+// the package manager rewrites its registry (by renaming a new copy over it) after every install or removal.
+// only the plugin folder itself is watched, so downloads and extractions in .tmp don't trigger it
+const INSTALLED_FILE_NAME = ".installed.json";
+
 await mkdir(plugin_dir, {recursive: true});
-await watch(plugin_dir, () => {
-    console.log("Plugin packages changed, notifying listeners...");
-    notify_package_list_change();
-}, {recursive: true});
+await watch(plugin_dir, (event) => {
+    if (event.paths.some((changed_path) => changed_path.endsWith(INSTALLED_FILE_NAME))) {
+        console.log("Installed packages changed, notifying listeners...");
+        notify_package_list_change();
+    }
+}, {recursive: false});

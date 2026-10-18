@@ -158,6 +158,9 @@ importers:
       '@fontsource-variable/dm-sans':
         specifier: ^5.2.6
         version: 5.3.0
+      '@pi-tray/package-spec':
+        specifier: workspace:*
+        version: link:../../packages/package-spec
       '@pi-tray/secure-channel':
         specifier: workspace:*
         version: link:../../packages/secure-channel

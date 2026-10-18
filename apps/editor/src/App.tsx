@@ -11,13 +11,13 @@ import {AnimatedRouter} from "./components/AnimatedRouter";
 import {LeftNav} from "./components/LeftNav";
 import {StatusToast} from "./components/StatusToast";
 
-import {routes} from "./routes.tsx";
+import {routes} from "./routes";
 import {NotFound} from "./pages/NotFound";
 
 import {onOpenUrl} from "@tauri-apps/plugin-deep-link";
 import {getCurrentWindow} from "@tauri-apps/api/window";
-import {install_package} from "./util/plugins.ts";
-import {AutostartPrompt} from "./components/AutostartPrompt.tsx";
+import {AutostartPrompt} from "./components/AutostartPrompt";
+import {confirm_and_install} from "./util/install_flow";
 
 /**
  * A wrapper component that conditionally renders the WebSocket provider based on the provided URL.<br>
@@ -96,8 +96,9 @@ const App = () => {
                     try {
                         const package_ref = express_data[name];
                         console.log(`Installing plugin from express list: ${name} (${package_ref})`);
-                        await install_package(package_ref);
-                        alert(`Plugin "${name}" installed successfully!`);
+                        if (await confirm_and_install(package_ref)) {
+                            alert(`Plugin "${name}" installed successfully!`);
+                        }
                     } catch (error) {
                         console.error("Failed to install plugin from express list:", error);
                         alert(`Failed to install plugin "${name}". Check the console for details.`);

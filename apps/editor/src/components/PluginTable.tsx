@@ -1,6 +1,6 @@
 import {ChevronRight} from "lucide-react";
 
-import {PackagePlugins, usePluginIndex} from "../util/plugins.ts";
+import {PackagePlugins, remove_package, usePluginIndex} from "../util/plugins.ts";
 
 interface TableRowProps {
     package_plugins: PackagePlugins;
@@ -13,6 +13,18 @@ const TableRow = ({package_plugins}: TableRowProps) => {
         <tr className="*:align-top">
             <td>
                 <div className="font-medium leading-5">{package_plugins.package_name}</div>
+                <div className="text-xs opacity-60">{package_plugins.installed.version} · {package_plugins.installed.source}</div>
+                <button className="btn btn-ghost btn-xs mt-1" onClick={async () => {
+                    if (!confirm(`Remove ${package_plugins.package_name}? Its saved data is kept, so reinstalling it keeps its settings.`)) {
+                        return;
+                    }
+
+                    try {
+                        await remove_package(package_plugins.package_name);
+                    } catch (error) {
+                        alert(`Couldn't remove it: ${error instanceof Error ? error.message : String(error)}`);
+                    }
+                }}>Remove</button>
 
                 {package_plugins.error && (
                     <div className="mt-1 flex h-6 items-center text-xs text-warning" title={package_plugins.error}>Couldn't read plugins</div>
