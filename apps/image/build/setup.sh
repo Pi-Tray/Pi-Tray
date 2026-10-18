@@ -649,7 +649,6 @@ exec chromium \
     --disable-infobars \
     --disable-session-crashed-bubble \
     --check-for-update-interval=31536000 \
-    --incognito \
     --force-dark-mode \
     --allow-file-access-from-files \
     "file:///opt/pi-tray/client/index.html?ws=${server_url}"
