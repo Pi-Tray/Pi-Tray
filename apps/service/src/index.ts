@@ -1,5 +1,5 @@
 // pi-tray-service: the server, the supervisor and the editor's plugin helper in one executable, so they share one copy of node
-//   pi-tray-service [supervise]                       the supervisor, which runs "pi-tray-service server"
+//   pi-tray-service supervise                         the supervisor, which runs "pi-tray-service server"
 //   pi-tray-service server                            the server
 //   pi-tray-service package info|resolve|install|remove|list …   the editor's plugin helper and installer
 //   pi-tray-service status|start|stop|restart|watch|quit|autostart …   the supervisor's commands
@@ -45,7 +45,7 @@ switch (command) {
         break;
 
     default:
-        // no command runs the supervisor, anything else is one of its commands
-        run_supervisor_cli(process.argv.slice(2));
+        console.error(`Unknown command: ${command}`);
+        process.exitCode = 1;
         break;
 }

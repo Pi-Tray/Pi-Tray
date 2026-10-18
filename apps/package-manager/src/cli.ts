@@ -18,6 +18,8 @@ export const EXIT_CONFLICT = 2;
 
 const print_json = (value: unknown) => console.log(JSON.stringify(value));
 
+// TODO: default to human readable output, add --json for JSON
+
 /**
  * Runs a package command.
  * @param argv the command and its arguments, e.g. ["install", "Pi-Tray/ghost-plugins", "--replace"]
@@ -25,6 +27,11 @@ const print_json = (value: unknown) => console.log(JSON.stringify(value));
  */
 export const run_package_cli = async (argv: string[]): Promise<number> => {
     const [command, ...command_args] = argv;
+
+    if (!command) {
+        console.error("Usage: package <command> [args]");
+        return 1;
+    }
 
     if (command === "info") {
         return run_package_info_command(command_args[0]);
