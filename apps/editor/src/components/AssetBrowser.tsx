@@ -351,6 +351,7 @@ export const AssetBrowser = ({heading, toolbar_end, manage = false, onPick, sele
         >
             <div className="flex flex-wrap items-center gap-3">
                 <div className="mr-auto">{heading}</div>
+                <p>Note that assets are currently served without encryption or authentication, so are therefore visible to anyone else on the network. This will be addressed soon.</p>
 
                 {assets && assets.length > 0 && (
                     <label className="input input-sm w-56">
