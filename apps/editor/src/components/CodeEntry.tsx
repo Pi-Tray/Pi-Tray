@@ -2,6 +2,8 @@ import React, {HTMLAttributes, useEffect, useRef, useState} from "react";
 
 export type BoxSize = "sm" | "md" | "lg";
 
+// TODO: new daisyui has native otp, move to that after updating daisyui
+
 export interface CodeEntryProps extends Omit<HTMLAttributes<HTMLDivElement>, "onChange"> {
     length?: number;
     value?: string;

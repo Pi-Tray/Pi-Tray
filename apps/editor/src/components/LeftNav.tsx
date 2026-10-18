@@ -1,7 +1,7 @@
 import {Link} from "wouter";
 import {usePathname} from "wouter/use-browser-location";
 
-import {Code, Images, LayoutGrid, Settings, Tablet, ToyBrick} from "lucide-react";
+import {Code, Images, LayoutGrid, Server, Settings, Tablet, ToyBrick} from "lucide-react";
 import {motion, AnimatePresence} from "motion/react";
 import {useConfigValue} from "../util/config";
 
@@ -70,6 +70,7 @@ export const LeftNav = () => {
                   }
               </AnimatePresence>
 
+              <LeftNavItem href="/server" title="Server" icon={<Server />} />
               <LeftNavItem href="/settings" title="Settings" icon={<Settings />} />
           </div>
       </ul>

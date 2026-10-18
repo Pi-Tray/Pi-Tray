@@ -1,5 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {ConfigKey, useConfigValue} from "../util/config";
+import {Link} from "wouter";
+import {Server} from "lucide-react";
 
 interface BaseSettingProps {
     label: string;
@@ -199,6 +201,11 @@ export const SettingsPage = () => {
                     />
                 </div>
             </div>
+
+            <Link href="/server" className="btn btn-primary mt-4">
+                <Server className="mr-2" />
+                Configure server
+            </Link>
         </>
     );
 }

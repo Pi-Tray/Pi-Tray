@@ -38,6 +38,17 @@
         }
       ]
     },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "binaries/pi-tray",
+          "args": true,
+          "sidecar": true
+        }
+      ]
+    },
+    "shell:allow-kill",
     "os:default"
   ]
 }

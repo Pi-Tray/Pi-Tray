@@ -19,6 +19,7 @@ import {getCurrentWindow} from "@tauri-apps/api/window";
 import {AutostartPrompt} from "./components/AutostartPrompt";
 import {confirm_and_install} from "./util/install_flow";
 import {parse_spec} from "@pi-tray/package-spec";
+import {SupervisorProvider} from "./contexts/SupervisorProvider.tsx";
 
 /**
  * A wrapper component that conditionally renders the WebSocket provider based on the provided URL.<br>
@@ -115,31 +116,33 @@ const App = () => {
     }, [handle_deep_link]);
 
     return (
-        <ConditionalWSProvider url={ws_url}>
-            <AutostartPrompt />
-            <div className="font-dm-sans flex h-screen max-h-screen w-screen max-w-screen bg-base-100 select-none overflow-hidden">
-                <LeftNav/>
-                <main className="w-full max-w-full h-full max-h-full">
-                    <AnimatedRouter
-                        routes={routes}
+        <SupervisorProvider>
+            <ConditionalWSProvider url={ws_url}>
+                <AutostartPrompt />
+                <div className="font-dm-sans flex h-screen max-h-screen w-screen max-w-screen bg-base-100 select-none overflow-hidden">
+                    <LeftNav/>
+                    <main className="w-full max-w-full h-full max-h-full">
+                        <AnimatedRouter
+                            routes={routes}
 
-                        not_found={<NotFound/>}
+                            not_found={<NotFound/>}
 
-                        animation_props={{
-                            initial: {opacity: 0},
-                            animate: {opacity: 1},
-                            exit: {opacity: 0},
-                            transition: {duration: 0.25, ease: "easeInOut"},
+                            animation_props={{
+                                initial: {opacity: 0},
+                                animate: {opacity: 1},
+                                exit: {opacity: 0},
+                                transition: {duration: 0.25, ease: "easeInOut"},
 
-                            className: "h-full w-full max-h-full max-w-full overflow-y-auto py-4 px-6",
-                        }}
-                    />
-                </main>
+                                className: "h-full w-full max-h-full max-w-full overflow-y-auto py-4 px-6",
+                            }}
+                        />
+                    </main>
 
-                {/* use a key to force remounting the component when the websocket url changes to reset its internal state */}
-                <StatusToast key={`status-${ws_url}`} />
-            </div>
-        </ConditionalWSProvider>
+                    {/* use a key to force remounting the component when the websocket url changes to reset its internal state */}
+                    <StatusToast key={`status-${ws_url}`} />
+                </div>
+            </ConditionalWSProvider>
+        </SupervisorProvider>
     );
 }
 

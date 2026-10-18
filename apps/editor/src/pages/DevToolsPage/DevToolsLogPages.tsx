@@ -34,9 +34,9 @@ export const DevToolsLogsLandingPage = () => {
     return (
         <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2">
-                <Link href="/devtools" className="btn btn-ghost btn-sm btn-square" title="Back to DevTools">
+                <button onClick={() => window.history.back()} className="btn btn-ghost btn-sm btn-square" title="Back">
                     <ArrowLeft className="w-4 h-4" />
-                </Link>
+                </button>
                 <h1 className="text-2xl font-bold">Logs</h1>
             </div>
 
@@ -235,9 +235,9 @@ export const DevToolsLogsPage = ({params}: {params?: {source?: string}}) => {
     return (
         <div className="flex h-full flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
-                <Link href="/devtools/logs" className="btn btn-ghost btn-sm btn-square" title="Back to logs">
+                <button onClick={() => window.history.back()} className="btn btn-ghost btn-sm btn-square" title="Back">
                     <ArrowLeft className="w-4 h-4" />
-                </Link>
+                </button>
                 <h1 className="text-2xl font-bold mr-auto">{source.label} logs</h1>
 
                 <select

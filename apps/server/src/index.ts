@@ -25,6 +25,7 @@ import {load_server_config} from "./config";
 
 import * as _handlers from "./handlers";
 import {create_address_filter} from "./network_filter";
+import {register_for_shutdown} from "./shutdown";
 const handlers: { [action: string]: MessageHandler | undefined } = _handlers;
 Object.freeze(handlers);
 
@@ -63,6 +64,8 @@ console.log(`Starting WebSocket server on ws://${host}:${port}`);
 // assets are served over plain http on the same port, so the websocket only has to carry references to them
 const http_server = createServer(handle_asset_request);
 const ws_server = new WebSocketServer({ server: http_server });
+
+register_for_shutdown(http_server, ws_server);
 
 // decrypts in order from one client, dispatching each message to its handler
 const dispatch = async (client: Client, data: WireMessage) => {
