@@ -1,4 +1,4 @@
-name: Build editor, server, and supervisor bundles
+name: Build editor and CLI
 
 on:
   workflow_dispatch:
@@ -12,6 +12,8 @@ on:
       - "apps/editor/**"
       - "apps/server/**"
       - "apps/supervisor/**"
+      - "apps/package-manager/**"
+      - "apps/cli/**"
       - "packages/types/**"
       - "packages/secure-channel/**"
       - "packages/paths/**"
