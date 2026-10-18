@@ -113,7 +113,7 @@ export interface PluginInfo {
     pushable?: boolean;
 
     /**
-     * Why the server would refuse to run this plugin, if it would. Checked by pi-tray-service with the server's own rules.
+     * Why the server would refuse to run this plugin, if it would. Checked by pi-tray CLI with the server's own rules.
      */
     problems?: string[];
 }
@@ -123,7 +123,7 @@ const plugin_info_cache = new Map<string, Promise<Record<string, PluginInfo>>>()
 subscribe_to_package_list_change(() => plugin_info_cache.clear());
 
 /**
- * Asks pi-tray-service for the display name and config template of every plugin in a package.<br>
+ * Asks pi-tray CLI for the display name and config template of every plugin in a package.<br>
  * Results are cached until the installed packages change, as each call starts a new process.
  * @param package_name the package name e.g. @pi-tray/builtin
  * @returns plugin info keyed by the plugin's name within the package, e.g. `run_command`
@@ -135,7 +135,7 @@ const get_package_plugin_info = (package_name: string): Promise<Record<string, P
     }
 
     const info_promise = (async () => {
-        const command = Command.sidecar("binaries/pi-tray-service", ["package", "info", package_name]);
+        const command = Command.sidecar("binaries/pi-tray", ["package", "info", package_name]);
         const result = await command.execute();
 
         if (result.code !== 0) {
@@ -249,7 +249,7 @@ export interface PackagePlugins {
 
 /**
  * A React hook that indexes the plugins contributed by every installed package.<br>
- * Shares the plugin info cache, so each package only starts pi-tray-service once until the installed packages change.
+ * Shares the plugin info cache, so each package only starts pi-tray CLI once until the installed packages change.
  * @returns each package with its plugins, in package.json order, or null until the first index completes
  */
 export const usePluginIndex = () => {

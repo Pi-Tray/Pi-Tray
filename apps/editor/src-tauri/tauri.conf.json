@@ -37,7 +37,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/pi-tray-service"]
+    "externalBin": ["binaries/pi-tray"]
   },
   "plugins": {
     "deep-link": {

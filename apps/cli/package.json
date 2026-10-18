@@ -1,8 +1,8 @@
 {
-    "name": "@pi-tray/service",
+    "name": "@pi-tray/cli",
     "version": "0.1.0",
     "private": true,
-    "description": "The server, the supervisor and the editor's plugin helper in one executable, so they share one copy of Node.js",
+    "description": "The server, the supervisor and package manager in one executable, so they share one copy of Node.js",
     "main": "dist/index.js",
     "scripts": {
         "start": "tsx src/index.ts",

@@ -67,6 +67,37 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
 
+  apps/cli:
+    dependencies:
+      '@pi-tray/package-manager':
+        specifier: workspace:*
+        version: link:../package-manager
+      '@pi-tray/server':
+        specifier: workspace:*
+        version: link:../server
+      '@pi-tray/supervisor':
+        specifier: workspace:*
+        version: link:../supervisor
+      minimist:
+        specifier: 'catalog:'
+        version: 1.2.8
+    devDependencies:
+      '@types/minimist':
+        specifier: 'catalog:'
+        version: 1.2.5
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.15
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   apps/client:
     dependencies:
       '@pi-tray/secure-channel':
@@ -265,37 +296,6 @@ importers:
       '@types/minimist':
         specifier: 'catalog:'
         version: 1.2.5
-      tsx:
-        specifier: 'catalog:'
-        version: 4.23.15
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-
-  apps/service:
-    dependencies:
-      '@pi-tray/package-manager':
-        specifier: workspace:*
-        version: link:../package-manager
-      '@pi-tray/server':
-        specifier: workspace:*
-        version: link:../server
-      '@pi-tray/supervisor':
-        specifier: workspace:*
-        version: link:../supervisor
-      minimist:
-        specifier: 'catalog:'
-        version: 1.2.8
-    devDependencies:
-      '@types/minimist':
-        specifier: 'catalog:'
-        version: 1.2.5
-      '@types/node':
-        specifier: 'catalog:'
-        version: 24.19.2
-      esbuild:
-        specifier: ^0.25.0
-        version: 0.25.12
       tsx:
         specifier: 'catalog:'
         version: 4.23.15

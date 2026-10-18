@@ -1,6 +1,7 @@
 import minimist from "minimist";
+import {spawn} from "child_process";
 
-const program_name = "pi-tray-service";
+const program_name = "pi-tray";
 
 // how to run this executable again: on its own when packaged, otherwise node with the same flags (e.g. tsx's) and this script
 const self_command = "pkg" in process ? [process.execPath] : [process.execPath, ...process.execArgv, process.argv[1]];
@@ -33,13 +34,39 @@ const supervisor_command = (name: string, usage: string, summary: string): Comma
     run: (command_args) => run_supervisor_cli([name, ...command_args])
 });
 
+// started at login, a console program gets a console window on windows, so the supervisor starts itself again without one and exits.
+// --foreground stays attached, for the hidden copy itself and for running it in a terminal
+const run_supervise = (command_args: string[]) => {
+    const supervise_args = command_args.filter((arg) => arg !== "--foreground");
+    const foreground = supervise_args.length !== command_args.length;
+
+    if (process.platform !== "win32" || foreground) {
+        run_supervisor_cli(["run", ...supervise_args]);
+        return;
+    }
+
+    const background = spawn(self_command[0], [...self_command.slice(1), "supervise", "--foreground", ...supervise_args], {
+        detached: true,
+        windowsHide: true,
+        stdio: "ignore",
+        // see server_env above: without it a packaged executable starting itself runs as plain node
+        env: {...process.env, PKG_EXECPATH: ""}
+    });
+
+    background.once("spawn", () => background.unref());
+    background.once("error", (error) => {
+        console.error(`${program_name}: couldn't start the supervisor in the background: ${error.message}`);
+        process.exitCode = 1;
+    });
+};
+
 const commands: Command[] = [
     {
         name: "supervise",
         group: "Subcommands",
-        usage: "supervise [args...]",
-        summary: "run the supervisor, which runs and manages the server",
-        run: (command_args) => run_supervisor_cli(["run", ...command_args])
+        usage: "supervise [--foreground] [args...]",
+        summary: "run the supervisor, which runs and manages the server. on windows it runs in the background unless --foreground",
+        run: run_supervise
     },
     {
         name: "server",

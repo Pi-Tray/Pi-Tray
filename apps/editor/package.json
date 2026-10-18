@@ -6,9 +6,9 @@
     "type": "module",
     "scripts": {
         "dev": "tauri dev",
-        "build": "tsc && vite build && pnpm run build:service",
-        "build:service": "pnpm --filter @pi-tray/service package --out ../editor/src-tauri/binaries --target-suffix",
-        "dev:vite": "node ../../scripts/ensure-service-sidecar.mjs && vite",
+        "build": "tsc && vite build && pnpm run build:cli",
+        "build:cli": "pnpm --filter @pi-tray/cli package --out ../editor/src-tauri/binaries --target-suffix",
+        "dev:vite": "node ../../scripts/ensure-cli-sidecar.mjs && vite",
         "preview": "vite preview",
         "tauri": "tauri"
     },

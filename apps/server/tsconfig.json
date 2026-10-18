@@ -1,5 +1,5 @@
 {
-  // only for type checking: tsx runs the server from source, and pi-tray-service bundles it with esbuild
+  // only for type checking: tsx runs the server from source, and pi-tray cli bundles it with esbuild
   "include": ["src/**/*.ts"],
   "compilerOptions": {
     /* Visit https://aka.ms/tsconfig to read more about this file */
