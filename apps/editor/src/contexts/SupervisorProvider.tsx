@@ -1,6 +1,9 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {Child, Command} from "@tauri-apps/plugin-shell";
 
+// the supervisor's replies, as "pi-tray <command> --json" prints them. written out here rather than imported from
+// @pi-tray/supervisor, which is node code the webview can't load
+
 /**
  * - running: the server process is up
  * - stopped: stopped on purpose, by a command or the server exiting cleanly
@@ -36,7 +39,10 @@ type SupervisorResponse = {ok: true, status: SupervisorStatus} | {ok: false, err
  */
 export type SupervisorConnection = "connecting" | "connected" | "not_running";
 
-export type ServerAction = "start" | "stop" | "restart";
+/**
+ * The supervisor's own commands: start, stop and restart the server, or quit to stop the server and the supervisor
+ */
+export type ServerAction = "start" | "stop" | "restart" | "quit";
 
 export interface SupervisorControl {
     connection: SupervisorConnection;
@@ -48,7 +54,20 @@ export interface SupervisorControl {
     pending_action: ServerAction | "launch" | null;
 
     /**
-     * Starts, stops or restarts the server through the supervisor.
+     * Turns Pi-Tray on: starts the supervisor if it isn't running, which starts the server, or tells the running
+     * supervisor to start the server, e.g. after it gave up on a crashing one.
+     * @throws if it couldn't
+     */
+    start: () => Promise<void>;
+
+    /**
+     * Turns Pi-Tray off: stops the server and quits the supervisor, until it's started again here or at login.
+     * @throws if it couldn't
+     */
+    stop: () => Promise<void>;
+
+    /**
+     * Runs one of the supervisor's own commands, e.g. restart. start and stop are what most things want instead.
      * @throws with the supervisor's message if it couldn't, e.g. it isn't running
      */
     run_action: (action: ServerAction) => Promise<void>;
@@ -69,6 +88,9 @@ const RETRY_INTERVAL_MS = 5_000;
 
 // soon after launching, as the supervisor takes a moment to open its pipe
 const RETRY_AFTER_LAUNCH_MS = 1_000;
+
+// an action stays pending until the watch shows it happened, or this long, so a missed update can't leave it stuck
+const PENDING_TIMEOUT_MS = 15_000;
 
 // one of the CLI's replies, each line of its output is one
 const parse_responses = (output: string): SupervisorResponse[] => {
@@ -108,6 +130,28 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
     const watch_child = useRef<Child | null>(null);
     const retry_timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const disposed = useRef(false);
+
+    // when the server running before a restart started, to tell the restarted one apart
+    const started_at_before_action = useRef<string | null>(null);
+    const pending_timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const begin_pending = useCallback((action: ServerAction | "launch") => {
+        started_at_before_action.current = status?.started_at ?? null;
+        setPendingAction(action);
+
+        if (pending_timeout.current) {
+            clearTimeout(pending_timeout.current);
+        }
+        pending_timeout.current = setTimeout(() => setPendingAction(null), PENDING_TIMEOUT_MS);
+    }, [status]);
+
+    const end_pending = useCallback(() => {
+        if (pending_timeout.current) {
+            clearTimeout(pending_timeout.current);
+            pending_timeout.current = null;
+        }
+        setPendingAction(null);
+    }, []);
 
     const handle_status = useCallback((new_status: SupervisorStatus) => {
         setConnection("connected");
@@ -191,8 +235,41 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
         };
     }, [start_watch]);
 
+    // the supervisor replies as soon as it's been asked, with the status from before it acts, e.g. still running
+    // after being told to stop. so the reply's status is ignored, and the action stays pending until the watch shows it done
+    useEffect(() => {
+        const state = status?.state ?? null;
+
+        const done = (() => {
+            switch (pending_action) {
+                case "quit":
+                    return connection === "not_running";
+                case "stop":
+                    return state !== null && state !== "running";
+                case "start":
+                    return state === "running";
+                case "restart":
+                    return state === "running" && status?.started_at !== started_at_before_action.current;
+                case "launch":
+                    return connection === "connected";
+                default:
+                    return false;
+            }
+        })();
+
+        if (done) {
+            end_pending();
+        }
+    }, [pending_action, connection, status, end_pending]);
+
+    useEffect(() => () => {
+        if (pending_timeout.current) {
+            clearTimeout(pending_timeout.current);
+        }
+    }, []);
+
     const run_action = useCallback(async (action: ServerAction) => {
-        setPendingAction(action);
+        begin_pending(action);
 
         try {
             const output = await Command.sidecar(CLI_SIDECAR, [action, "--json"]).execute();
@@ -205,16 +282,14 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
             if (!response.ok) {
                 throw new Error(response.error);
             }
-
-            // the watch reports it too, this just shows it straight away
-            handle_status(response.status);
-        } finally {
-            setPendingAction(null);
+        } catch (error) {
+            end_pending();
+            throw error;
         }
-    }, [handle_status]);
+    }, [begin_pending, end_pending]);
 
     const launch = useCallback(async () => {
-        setPendingAction("launch");
+        begin_pending("launch");
         setConnection("connecting");
 
         try {
@@ -230,15 +305,25 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
             }
         } catch (error) {
             setConnection("not_running");
+            end_pending();
             throw error;
-        } finally {
-            setPendingAction(null);
         }
-    }, [start_watch]);
+    }, [start_watch, begin_pending, end_pending]);
+
+    const start = useCallback(async () => {
+        if (connection === "connected") {
+            await run_action("start");
+        } else {
+            await launch();
+        }
+    }, [connection, run_action, launch]);
+
+    // the supervisor replies, then quits, which ends the watch and shows it as not running
+    const stop = useCallback(() => run_action("quit"), [run_action]);
 
     const control = useMemo<SupervisorControl>(
-        () => ({connection, status, pending_action, run_action, launch}),
-        [connection, status, pending_action, run_action, launch]
+        () => ({connection, status, pending_action, start, stop, run_action, launch}),
+        [connection, status, pending_action, start, stop, run_action, launch]
     );
 
     return (

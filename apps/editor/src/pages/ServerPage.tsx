@@ -1,29 +1,149 @@
-import {useMemo} from "react";
-import {Check, Circle, Ellipsis, Eye, RotateCcw, Server, Tally1, X} from "lucide-react";
+import {useState} from "react";
+import {Check, Circle, Ellipsis, Eye, RotateCcw, Server, Tally1, TriangleAlert, X} from "lucide-react";
 import {Link} from "wouter";
 
-import {useSupervisor} from "../contexts/SupervisorProvider";
+import {SupervisorControl, useSupervisor} from "../contexts/SupervisorProvider";
 import {useAutostart} from "../util/autostart";
 
-// TODO: stop should quit supervisor fully, start shuld bring it back up if not running, else tell it to start server (edge case)
+interface ServerSummary {
+    text: string;
+
+    /** Shown under the text, e.g. when it started or why it stopped */
+    detail: string | null;
+
+    tone: "pending" | "success" | "neutral" | "warning" | "error";
+}
+
+const TONE_CLASSES: Record<ServerSummary["tone"], string> = {
+    pending: "bg-gray-500",
+    success: "bg-success",
+    neutral: "bg-gray-500",
+    warning: "bg-warning",
+    error: "bg-error"
+};
+
+const PENDING_TEXT: Record<NonNullable<SupervisorControl["pending_action"]>, string> = {
+    start: "Starting Pi-Tray...",
+    launch: "Starting Pi-Tray...",
+    stop: "Stopping the server...",
+    quit: "Stopping Pi-Tray...",
+    restart: "Restarting the server..."
+};
+
+const format_time = (iso: string) => new Date(iso).toLocaleString();
+
+const describe_exit = (exit: {code: number | null, signal: string | null, at: string}) => {
+    return `Last exited ${exit.signal ? `from ${exit.signal}` : `with code ${exit.code}`} at ${format_time(exit.at)}`;
+}
+
+const summarise = (supervisor: SupervisorControl): ServerSummary => {
+    if (supervisor.pending_action) {
+        return {text: PENDING_TEXT[supervisor.pending_action], detail: null, tone: "pending"};
+    }
+
+    if (supervisor.connection === "connecting") {
+        return {text: "Checking...", detail: null, tone: "pending"};
+    }
+
+    if (supervisor.connection === "not_running" || !supervisor.status) {
+        return {
+            text: "Pi-Tray isn't running.",
+            detail: "Your Pi can't do anything until it's started.",
+            tone: "error"
+        };
+    }
+
+    const {state, started_at, last_exit} = supervisor.status;
+
+    switch (state) {
+        case "running":
+            return {
+                text: "The server is running!",
+                detail: started_at ? `Since ${format_time(started_at)}` : null,
+                tone: "success"
+            };
+        case "stopped":
+            return {
+                text: "The server is stopped.",
+                detail: last_exit ? describe_exit(last_exit) : null,
+                tone: "neutral"
+            };
+        case "waiting_to_restart":
+            return {
+                text: "The server crashed, and will restart shortly.",
+                detail: last_exit ? describe_exit(last_exit) : null,
+                tone: "warning"
+            };
+        case "failed":
+            return {
+                text: "The server kept crashing, so it was stopped.",
+                detail: last_exit ? `${describe_exit(last_exit)}. Check the server logs for why.` : "Check the server logs for why.",
+                tone: "error"
+            };
+    }
+}
+
+const SummaryIcon = ({tone}: {tone: ServerSummary["tone"]}) => {
+    switch (tone) {
+        case "pending":
+            return <Ellipsis className="min-w-4 h-4" />;
+        case "success":
+            return <Check className="min-w-4 h-4" />;
+        case "warning":
+            return <TriangleAlert className="min-w-4 h-4" />;
+        default:
+            return <X className="min-w-4 h-4" />;
+    }
+}
 
 export const ServerPage = () => {
     const supervisor = useSupervisor();
-
-    const is_running = useMemo(() => supervisor.status && supervisor.status.state === "running", [supervisor.status]);
-    const is_pending = useMemo(() => !!supervisor.pending_action, [supervisor.pending_action]);
-
     const autostart = useAutostart();
+
+    const [action_error, setActionError] = useState<string | null>(null);
+
+    const summary = summarise(supervisor);
+
+    const busy = supervisor.pending_action !== null || supervisor.connection === "connecting";
+    const supervisor_running = supervisor.connection === "connected";
+    const server_state = supervisor.status?.state ?? null;
+
+    // the server is up, or the supervisor is about to bring it back up by itself
+    const server_up = server_state === "running" || server_state === "waiting_to_restart";
+
+    const run = async (task: () => Promise<void>) => {
+        setActionError(null);
+
+        try {
+            await task();
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : String(error));
+        }
+    }
+
+    const confirm_stop = () => {
+        const comes_back = autostart.enabled
+            ? "It starts again automatically when you log in, or you can start it here at any time."
+            : "You can start it again here at any time.";
+
+        if (confirm(`Stop Pi-Tray?\n\nYour Pi will disconnect and its buttons won't do anything until Pi-Tray is started again. ${comes_back}`)) {
+            void run(supervisor.stop);
+        }
+    }
 
     return (
         <div className="flex flex-col gap-10 items-start justify-start">
             <h1 className="text-2xl font-bold">Server</h1>
 
-            <div className="flex items-center gap-3 font-bold">
-                <div className={`${is_pending ? "bg-gray-500" : (is_running ? "bg-success" : "bg-error")} p-4 rounded-full w-2 h-2 flex items-center justify-center text-white`}>
-                    {is_pending ? <Ellipsis className="min-w-4 h-4" /> : (is_running ? <Check className="min-w-4 h-4" /> : <X className="min-w-4 h-4" />)}
+            <div className="flex items-center gap-3">
+                <div className={`${TONE_CLASSES[summary.tone]} p-4 rounded-full w-2 h-2 flex items-center justify-center text-white`}>
+                    <SummaryIcon tone={summary.tone} />
                 </div>
-                <span>{is_pending ? `Applying ${supervisor.pending_action} action...` : (is_running ? "The server is running!" : "The server is not running.")}</span>
+
+                <div className="flex flex-col justify-center h-12">
+                    <span className="font-bold">{summary.text}</span>
+                    {summary.detail && <span className="text-sm opacity-70">{summary.detail}</span>}
+                </div>
             </div>
 
             <div className="flex flex-col gap-4">
@@ -33,15 +153,15 @@ export const ServerPage = () => {
                     <div className="join">
                         <button
                             className="btn join-item"
-                            disabled={!is_running || supervisor.pending_action === "stop" || supervisor.pending_action === "restart"}
-                            onClick={() => supervisor.run_action("stop")}
+                            disabled={busy || !supervisor_running}
+                            onClick={confirm_stop}
                         >
                             <Circle className="mr-2" /> Stop
                         </button>
                         <button
                             className="btn join-item"
-                            disabled={!!is_running || supervisor.pending_action === "start" || supervisor.pending_action === "restart"}
-                            onClick={() => supervisor.run_action("start")}
+                            disabled={busy || server_up}
+                            onClick={() => void run(supervisor.start)}
                         >
                             <Tally1 /> Start
                         </button>
@@ -49,12 +169,14 @@ export const ServerPage = () => {
 
                     <button
                         className="btn"
-                        disabled={supervisor.pending_action === "restart"}
-                        onClick={() => supervisor.run_action("restart")}
+                        disabled={busy || !supervisor_running}
+                        onClick={() => void run(() => supervisor.run_action("restart"))}
                     >
                         <RotateCcw className="mr-2" /> Restart
                     </button>
                 </div>
+
+                {action_error && <p className="text-sm text-error">{action_error}</p>}
             </div>
 
             <div className="flex flex-col gap-4">
@@ -82,12 +204,12 @@ export const ServerPage = () => {
                 <h2 className="text-xl font-bold">Logs</h2>
 
                 <div className="flex gap-2">
-                    <Link href="/devtools/logs/server" className="btn btn-primary">
+                    <Link href="/devtools/logs/server" className="btn btn-outline">
                         <Server className="mr-2" />
                         View server logs
                     </Link>
 
-                    <Link to="/devtools/logs/supervisor" className="btn btn-primary">
+                    <Link href="/devtools/logs/supervisor" className="btn btn-outline">
                         <Eye className="mr-2" />
                         View supervisor logs
                     </Link>
