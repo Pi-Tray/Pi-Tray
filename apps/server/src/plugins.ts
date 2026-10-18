@@ -5,7 +5,7 @@ import path from "path";
 import {createRequire} from "module";
 import {plugin_dir} from "@pi-tray/paths";
 
-import {installed_file, package_folder} from "@pi-tray/installer/read";
+import {installed_file, InstalledRegistry, package_folder, read_installed} from "@pi-tray/installer/read";
 import {split_plugin_reference} from "@pi-tray/package-spec";
 
 // plain node's require, rather than the bundle's, which esbuild and pkg wrap. only ever given absolute paths
@@ -54,6 +54,14 @@ export const clear_plugin_cache = () => {
     plugin_module_paths.clear();
 }
 
+// what's installed, re-read whenever the package manager changes it, so a folder it didn't install is never loaded
+let installed_packages: InstalledRegistry["packages"] | null = null;
+
+const get_installed_packages = (): InstalledRegistry["packages"] => {
+    installed_packages ??= read_installed().packages;
+    return installed_packages;
+}
+
 /**
  * Loads a plugin and validates its structure, or returns the already loaded copy.<br>
  * The plugin's folder (e.g. <plugin dir>/@pi-tray/builtin/run_command) must export a plugin object as its default export.<br>
@@ -69,6 +77,10 @@ export const load_plugin = (name: string) => {
 
     // throws for a name that isn't a plugin reference, so it can never point outside plugin_dir
     const {package_name, plugin_name} = split_plugin_reference(name);
+
+    if (!get_installed_packages()[package_name]) {
+        throw new Error(`${package_name} isn't installed, install it with the package manager before loading its plugins.`);
+    }
 
     // remember what was already cached so we can tell which modules this plugin pulled in
     const cache_before_load = new Set(Object.keys(require_plugin.cache));
@@ -99,5 +111,6 @@ export const load_plugin = (name: string) => {
 // installing, removing or updating a package changes the registry, so drop every loaded plugin when it does
 fs.watchFile(installed_file, {interval: 1000}, () => {
     console.log("Installed packages changed, clearing plugin cache.");
+    installed_packages = null;
     clear_plugin_cache();
 });
