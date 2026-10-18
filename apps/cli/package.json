@@ -7,7 +7,7 @@
     "scripts": {
         "start": "tsx src/index.ts",
         "build": "node build.mjs",
-        "package": "pnpm build && node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray --description \"Pi-Tray CLI/background service\" --icon ../editor/src-tauri/icons/icon.ico"
+        "package": "node ../../scripts/fetch-bundled-packages.mjs && pnpm build && node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray --description \"Pi-Tray CLI/background service\" --icon ../editor/src-tauri/icons/icon.ico"
     },
     "dependencies": {
         "@pi-tray/server": "workspace:*",
@@ -21,5 +21,13 @@
         "typescript": "catalog:",
         "esbuild": "^0.25.0",
         "tsx": "catalog:"
+    },
+    "pi-tray": {
+        "bundled_packages": [
+            "Pi-Tray/builtin-plugins@v1.2.0"
+        ]
+    },
+    "pkg": {
+        "assets": ["bundled/**/*"]
     }
 }

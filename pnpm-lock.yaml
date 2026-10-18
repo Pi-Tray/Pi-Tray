@@ -336,6 +336,9 @@ importers:
       '@pi-tray/paths':
         specifier: workspace:*
         version: link:../paths
+      semver:
+        specifier: ^7.8.5
+        version: 7.8.5
       tar:
         specifier: ^7.4.3
         version: 7.5.22
@@ -343,6 +346,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
+      '@types/semver':
+        specifier: ^7.8.0
+        version: 7.8.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

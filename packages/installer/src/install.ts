@@ -5,7 +5,7 @@ import path from "path";
 import {parse_spec} from "@pi-tray/package-spec";
 
 import {download_archive, extract_package, read_archive_package_json} from "./archive";
-import {read_installed, write_installed} from "./installed";
+import {InstalledRegistry, read_installed, write_installed} from "./installed";
 import {package_folder, work_dir} from "./location";
 import {with_install_lock} from "./lock";
 import {resolve_package, ResolvedPackage} from "./resolve";
@@ -113,25 +113,7 @@ export const install_package = async (spec: string, options: InstallOptions = {}
             };
         }
 
-        fs.mkdirSync(work_dir, {recursive: true});
-        const attempt_dir = fs.mkdtempSync(path.join(work_dir, `${crypto.randomBytes(4).toString("hex")}-`));
-
-        try {
-            await install_resolved(resolved, attempt_dir);
-        } finally {
-            fs.rmSync(attempt_dir, {recursive: true, force: true});
-        }
-
-        // written last, so the server only reloads once the new files are in place
-        const registry = read_installed();
-        registry.packages[resolved.name] = {
-            version: resolved.version,
-            source: resolved.source,
-            target: resolved.target,
-            pinned: resolved.pinned,
-            installed_at: new Date().toISOString()
-        };
-        write_installed(registry);
+        await install_resolved_package(resolved);
 
         return {
             status: "installed",
@@ -141,4 +123,31 @@ export const install_package = async (spec: string, options: InstallOptions = {}
             resolved
         };
     });
+}
+
+/**
+ * Downloads (if it's remote), extracts and swaps in a resolved package, then records it. Only call it while holding the install lock.
+ * @param update_registry any other change to make in the same registry write
+ */
+export const install_resolved_package = async (resolved: ResolvedPackage, update_registry?: (registry: InstalledRegistry) => void) => {
+    fs.mkdirSync(work_dir, {recursive: true});
+    const attempt_dir = fs.mkdtempSync(path.join(work_dir, `${crypto.randomBytes(4).toString("hex")}-`));
+
+    try {
+        await install_resolved(resolved, attempt_dir);
+    } finally {
+        fs.rmSync(attempt_dir, {recursive: true, force: true});
+    }
+
+    // written last, so the server only reloads once the new files are in place
+    const registry = read_installed();
+    registry.packages[resolved.name] = {
+        version: resolved.version,
+        source: resolved.source,
+        target: resolved.target,
+        pinned: resolved.pinned,
+        installed_at: new Date().toISOString()
+    };
+    update_registry?.(registry);
+    write_installed(registry);
 }

@@ -1,5 +1,6 @@
 import minimist from "minimist";
 import {spawn} from "child_process";
+import * as path from "node:path";
 
 const program_name = "pi-tray";
 
@@ -60,6 +61,15 @@ const run_supervise = (command_args: string[]) => {
     });
 };
 
+// the plugin packages that ship inside this executable (see scripts/fetch-bundled-packages.mjs), next to dist/ or src/
+const bundled_dir = path.join(__dirname, "..", "bundled");
+
+// installs the bundled packages before a command that uses plugins, loaded only then
+const install_bundled_packages = (): Promise<void> => {
+    const package_manager: typeof import("@pi-tray/package-manager/bundled") = require("@pi-tray/package-manager/bundled");
+    return package_manager.install_bundled_packages(bundled_dir);
+};
+
 const commands: Command[] = [
     {
         name: "supervise",
@@ -76,7 +86,7 @@ const commands: Command[] = [
         run: (command_args) => {
             // the server reads its own arguments from process.argv, so it should only see its own
             process.argv.splice(2, process.argv.length - 2, ...command_args);
-            require("@pi-tray/server");
+            install_bundled_packages().then(() => require("@pi-tray/server"));
         }
     },
     {
@@ -87,9 +97,11 @@ const commands: Command[] = [
         run: (command_args) => {
             const package_manager: typeof import("@pi-tray/package-manager/cli") = require("@pi-tray/package-manager/cli");
 
-            package_manager.run_package_cli(command_args).then((exit_code) => {
-                process.exitCode = exit_code;
-            });
+            install_bundled_packages()
+                .then(() => package_manager.run_package_cli(command_args))
+                .then((exit_code) => {
+                    process.exitCode = exit_code;
+                });
         }
     },
     supervisor_command("status", "status [args...]", "show the supervisor and server status"),

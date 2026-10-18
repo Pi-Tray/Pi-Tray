@@ -202,7 +202,20 @@ const absolute_archive_path = (archive_path: string): string => {
     return path.resolve(expanded).replace(/^[a-z]:/, (drive) => drive.toUpperCase());
 }
 
-const resolve_local = async (archive_path: string): Promise<ResolvedPackage> => {
+/**
+ * Where an archive really came from, for one that Pi-Tray ships rather than one the user picked.
+ */
+export interface ArchiveOrigin {
+    /** Recorded as its source, e.g. github:pi-tray/builtin-plugins, so it's updated from there like any other package */
+    source: string;
+    trusted: boolean;
+}
+
+/**
+ * Works out what installing a local archive would install, as {@link resolve_package} does for a file spec.
+ * @param origin where it really came from, for an archive Pi-Tray ships. Without it, the file is the source and it isn't trusted
+ */
+export const resolve_archive = async (archive_path: string, origin?: ArchiveOrigin): Promise<ResolvedPackage> => {
     const absolute_path = absolute_archive_path(archive_path);
 
     if (!fs.existsSync(absolute_path) || !fs.statSync(absolute_path).isFile()) {
@@ -211,11 +224,12 @@ const resolve_local = async (archive_path: string): Promise<ResolvedPackage> => 
 
     const package_json = await read_archive_package_json(absolute_path);
     const build_info = package_json["pi-tray"];
+    const trusted = origin?.trusted ?? false;
 
-    // local files are never trusted, so they can never use the @pi-tray scope
-    check_installable(package_json.name, package_json.version, build_info.target, build_info.node_abi, false);
+    // a file the user picked is never trusted, so it can never use the @pi-tray scope
+    check_installable(package_json.name, package_json.version, build_info.target, build_info.node_abi, trusted);
 
-    const formatted_source = format_source({kind: "file", path: absolute_path});
+    const formatted_source = origin?.source ?? format_source({kind: "file", path: absolute_path});
     const {installed, folder_exists} = find_installed(package_json.name);
 
     return {
@@ -223,7 +237,7 @@ const resolve_local = async (archive_path: string): Promise<ResolvedPackage> => 
         version: package_json.version,
         description: typeof package_json.description === "string" ? package_json.description : null,
         source: formatted_source,
-        trusted: false,
+        trusted,
         pinned: false,
         target: build_info.target,
         plugins: Array.isArray(build_info.plugins) ? build_info.plugins : null,
@@ -244,5 +258,5 @@ export const resolve_package = async (source: PackageSource): Promise<ResolvedPa
 
     return location.type === "manifest"
         ? resolve_remote(source, location.url)
-        : resolve_local(location.path);
+        : resolve_archive(location.path);
 }

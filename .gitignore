@@ -8,3 +8,4 @@ dist/
 out/
 *.tgz
 exe/
+apps/service/bundled/

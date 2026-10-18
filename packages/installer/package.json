@@ -11,7 +11,9 @@
     },
     "typesVersions": {
         "*": {
-            "read": ["./src/read.ts"]
+            "read": [
+                "./src/read.ts"
+            ]
         }
     },
     "files": [
@@ -20,10 +22,12 @@
     "dependencies": {
         "@pi-tray/package-spec": "workspace:*",
         "@pi-tray/paths": "workspace:*",
-        "tar": "^7.4.3"
+        "tar": "^7.4.3",
+        "semver": "^7.8.5"
     },
     "devDependencies": {
         "@types/node": "catalog:",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "@types/semver": "^7.8.0"
     }
 }

@@ -3,6 +3,16 @@ import path from "path";
 
 import {lock_file} from "./location";
 
+/**
+ * Thrown when another install or removal holds the lock.
+ */
+export class InstallLockedError extends Error {
+    constructor() {
+        super("Another install or removal is running, try again once it's finished");
+        this.name = "InstallLockedError";
+    }
+}
+
 const is_process_running = (pid: number): boolean => {
     try {
         process.kill(pid, 0);
@@ -45,13 +55,13 @@ export const with_install_lock = async <Result>(task: () => Promise<Result>): Pr
 
     if (!try_take_lock()) {
         if (!is_stale()) {
-            throw new Error("Another install or removal is running, try again once it's finished");
+            throw new InstallLockedError();
         }
 
         fs.rmSync(lock_file, {force: true});
 
         if (!try_take_lock()) {
-            throw new Error("Another install or removal is running, try again once it's finished");
+            throw new InstallLockedError();
         }
     }
 

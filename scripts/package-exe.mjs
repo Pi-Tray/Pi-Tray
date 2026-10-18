@@ -72,12 +72,26 @@ fs.mkdirSync(out_dir, {recursive: true});
 
 console.log(`Packaging ${args.entry} as ${exe_path} (${NODE_TARGET}-${pkg_platform}-${pkg_arch})`);
 
-await run_pkg([
-    args.entry,
-    "--targets", `${NODE_TARGET}-${pkg_platform}-${pkg_arch}`,
-    "--output", exe_path,
-    "--compress", "Brotli"
-]);
+// the app's package.json can list files to put inside the executable, as "pkg": {"assets": [...]}.
+// pkg is given only that, as with the whole package.json it also packs every dependency's files, which are already bundled
+const app_manifest = fs.existsSync("package.json") ? JSON.parse(fs.readFileSync("package.json", "utf8")) : {};
+const pkg_config_path = ".pkg-config.json";
+
+if (app_manifest.pkg) {
+    fs.writeFileSync(pkg_config_path, JSON.stringify({name: app_manifest.name, pkg: app_manifest.pkg}));
+}
+
+try {
+    await run_pkg([
+        args.entry,
+        ...(app_manifest.pkg ? ["--config", pkg_config_path] : []),
+        "--targets", `${NODE_TARGET}-${pkg_platform}-${pkg_arch}`,
+        "--output", exe_path,
+        "--compress", "Brotli"
+    ]);
+} finally {
+    fs.rmSync(pkg_config_path, {force: true});
+}
 
 if (is_windows) {
     // https://yao-pkg.github.io/pkg/guide/advanced-windows-metadata

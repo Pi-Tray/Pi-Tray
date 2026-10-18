@@ -21,6 +21,9 @@ export interface InstalledPackage {
 export interface InstalledRegistry {
     schema_version: 1;
     packages: Record<string, InstalledPackage>;
+
+    /** Packages that come with Pi-Tray and have been installed once already, so removing one isn't undone on the next start */
+    offered_bundled?: string[];
 }
 
 const empty_registry = (): InstalledRegistry => ({schema_version: 1, packages: {}});
@@ -56,6 +59,10 @@ export const read_installed = (): InstalledRegistry => {
 
     if (registry.schema_version !== 1 || typeof registry.packages !== "object" || registry.packages === null) {
         throw new Error(`${installed_file} isn't a registry this version of Pi-Tray understands`);
+    }
+
+    if (registry.offered_bundled !== undefined && !(Array.isArray(registry.offered_bundled) && registry.offered_bundled.every((name) => typeof name === "string"))) {
+        throw new Error(`${installed_file} has a broken offered_bundled list`);
     }
 
     for (const [package_name, entry] of Object.entries(registry.packages)) {

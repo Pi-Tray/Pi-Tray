@@ -5,7 +5,8 @@
     "description": "Installs, removes and describes plugin packages for the editor.",
     "main": "./src/cli.ts",
     "exports": {
-        "./cli": "./src/cli.ts"
+        "./cli": "./src/cli.ts",
+        "./bundled": "./src/bundled.ts"
     },
     "scripts": {
         "start": "tsx src/index.ts"
