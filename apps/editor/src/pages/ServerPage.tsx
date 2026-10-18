@@ -5,6 +5,8 @@ import {Link} from "wouter";
 import {useSupervisor} from "../contexts/SupervisorProvider";
 import {useAutostart} from "../util/autostart";
 
+// TODO: stop should quit supervisor fully, start shuld bring it back up if not running, else tell it to start server (edge case)
+
 export const ServerPage = () => {
     const supervisor = useSupervisor();
 
