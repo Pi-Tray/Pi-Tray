@@ -3,9 +3,9 @@ import {find_plugin_problems, Plugin} from "./types";
 import fs from "fs";
 import path from "path";
 import {createRequire} from "module";
-import {in_plugin_dir, plugin_dir} from "@pi-tray/paths";
+import {plugin_dir} from "@pi-tray/paths";
 
-import {package_folder} from "./package_location";
+import {installed_file, package_folder} from "@pi-tray/installer/read";
 import {split_plugin_reference} from "@pi-tray/package-spec";
 
 // plain node's require, rather than the bundle's, which esbuild and pkg wrap. only ever given absolute paths
@@ -57,7 +57,7 @@ export const clear_plugin_cache = () => {
 /**
  * Loads a plugin and validates its structure, or returns the already loaded copy.<br>
  * The plugin's folder (e.g. <plugin dir>/@pi-tray/builtin/run_command) must export a plugin object as its default export.<br>
- * Plugins stay loaded until {@link clear_plugin_cache} is called, which happens automatically when installed.json changes.
+ * Plugins stay loaded until {@link clear_plugin_cache} is called, which happens automatically when a package is installed or removed.
  * @param name the plugin's full name, e.g. @pi-tray/builtin/run_command
  * @return the loaded plugin object
  */
@@ -96,10 +96,8 @@ export const load_plugin = (name: string) => {
     return plugin as Plugin;
 }
 
-// installing, removing or updating a package changes installed.json, so drop every loaded plugin when it does
-const installed_registry = in_plugin_dir("installed.json");
-
-fs.watchFile(installed_registry, {interval: 1000}, () => {
-    console.log("installed.json changed, clearing plugin cache.");
+// installing, removing or updating a package changes the registry, so drop every loaded plugin when it does
+fs.watchFile(installed_file, {interval: 1000}, () => {
+    console.log("Installed packages changed, clearing plugin cache.");
     clear_plugin_cache();
 });

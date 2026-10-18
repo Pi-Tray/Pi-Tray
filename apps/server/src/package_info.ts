@@ -6,7 +6,7 @@ import path from "path";
 import {plugin_dir} from "@pi-tray/paths";
 import {find_plugin_problems} from "@pi-tray/types";
 
-import {package_folder} from "./package_location";
+import {package_folder} from "@pi-tray/installer/read";
 
 interface PackageInfo {
     display_name?: string;

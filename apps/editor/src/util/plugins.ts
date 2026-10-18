@@ -314,7 +314,7 @@ export const usePluginList = () => {
 export {unwrap_plugin_reference} from "@pi-tray/types";
 
 // installing or removing a package adds or removes its folder. recursive, as scoped packages are a folder deeper
-// TODO: watch installed.json instead once the service writes it
+// TODO: watch the installer's .installed.json (installed_file) instead, so downloads in .tmp don't trigger it
 await mkdir(plugin_dir, {recursive: true});
 await watch(plugin_dir, () => {
     console.log("Plugin packages changed, notifying listeners...");
