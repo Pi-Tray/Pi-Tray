@@ -15,8 +15,7 @@
         "build": "tsc",
         "where:appdata": "node bin/where_appdata.js",
         "where:pi-tray": "node bin/where_appdata.js pi-tray",
-        "where:plugins": "node bin/where_appdata.js pi-tray/plugins",
-        "package": "pnpm build && node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray-server --description \"Pi-Tray Server\" --icon ../editor/src-tauri/icons/icon.ico"
+        "where:plugins": "node bin/where_appdata.js pi-tray/plugins"
     },
     "author": "obfuscatedgenerated",
     "license": "MIT",

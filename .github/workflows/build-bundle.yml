@@ -1,4 +1,4 @@
-name: Build editor and CLI
+name: Build app
 
 on:
   workflow_dispatch:

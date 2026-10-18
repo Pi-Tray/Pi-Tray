@@ -5,7 +5,8 @@
         "build": "pnpm -r build",
         "dev": "pnpm -r --parallel --stream run dev",
         "typecheck": "pnpm -r exec tsc --noEmit",
-        "release:editor": "pnpm --filter @pi-tray/editor tauri build"
+        "build:cli": "pnpm --filter @pi-tray/cli package",
+        "build:app": "pnpm --filter @pi-tray/editor tauri build && node scripts/collect-app.mjs"
     },
     "devDependencies": {
         "@yao-pkg/pkg": "^6.23.0",

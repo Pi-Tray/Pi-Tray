@@ -8,4 +8,5 @@ dist/
 out/
 *.tgz
 exe/
-apps/service/bundled/
+apps/cli/bundled/
+.pkg-config,json

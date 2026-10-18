@@ -1,8 +1,0 @@
-[
-  {
-    "file": "pi-tray-builtin-1.2.0.tgz",
-    "source": "github:pi-tray/builtin-plugins",
-    "name": "@pi-tray/builtin",
-    "version": "1.2.0"
-  }
-]

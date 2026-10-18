@@ -1,5 +1,5 @@
 // builds a compiled app into a standalone executable with pkg, run from the app's folder:
-//   node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray-server --description "Pi-Tray Server" [--icon app.ico] [--windowed] [--out exe]
+//   node ../../scripts/package-exe.mjs --entry dist/index.js --name pi-tray --description "Pi-Tray CLI/background service" [--icon app.ico] [--windowed] [--out exe] [--target-suffix]
 // builds for the target in PI_TRAY_TARGET_TRIPLE or TAURI_ENV_TARGET_TRIPLE, or this machine if neither is set.
 // sets the properties of the executable on Windows, including the icon and whether it has a console window
 
@@ -11,6 +11,7 @@ import * as PE from "pe-library";
 import * as ResEdit from "resedit";
 
 import {node_major} from "./node-version.mjs";
+import {target_triple as get_target_triple} from "./target-triple.mjs";
 
 // pinned rather than following this machine's node: pkg's cross-compiled node 22 executables are broken
 // https://yao-pkg.github.io/pkg/guide/targets#cross-compilation-support
@@ -43,18 +44,7 @@ const PKG_ARCHES = {
     aarch64: "arm64"
 };
 
-const host_triple = () => {
-    const arch = {x64: "x86_64", arm64: "aarch64"}[process.arch];
-    const platform = {win32: "pc-windows-msvc", darwin: "apple-darwin", linux: "unknown-linux-gnu"}[process.platform];
-
-    if (!arch || !platform) {
-        fail(`can't build on ${process.platform}-${process.arch}`);
-    }
-
-    return `${arch}-${platform}`;
-}
-
-const target_triple = process.env.PI_TRAY_TARGET_TRIPLE || process.env.TAURI_ENV_TARGET_TRIPLE || host_triple();
+const target_triple = get_target_triple();
 
 const pkg_platform = Object.entries(PKG_PLATFORMS).find(([triple_part]) => target_triple.includes(triple_part))?.[1];
 const pkg_arch = PKG_ARCHES[target_triple.split("-")[0]];
