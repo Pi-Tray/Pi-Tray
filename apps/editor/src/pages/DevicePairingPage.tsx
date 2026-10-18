@@ -71,7 +71,7 @@ export const DevicePairingPage = () => {
         <div className="flex flex-col gap-4 h-full w-full items-start justify-start">
             <h1 className="text-2xl font-bold">Pair new device</h1>
 
-            <div className="flex flex-col gap-2 items-center justify-center h-full w-full gap-10">
+            <div className="flex flex-col items-center justify-center h-full w-full gap-10">
                 <label className={`text-xl flex flex-col items-center justify-center gap-4 ${invalid_code ? "animate-shake" : ""}`}>
                     Enter the code displayed on the device you wish to pair:
                     <CodeEntry length={PAIRING_CODE_LENGTH} value={code} on_change={setCode} status={invalid_code ? "error" : "idle"} />
