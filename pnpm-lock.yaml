@@ -283,7 +283,13 @@ importers:
       '@pi-tray/supervisor':
         specifier: workspace:*
         version: link:../supervisor
+      minimist:
+        specifier: 'catalog:'
+        version: 1.2.8
     devDependencies:
+      '@types/minimist':
+        specifier: 'catalog:'
+        version: 1.2.5
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
