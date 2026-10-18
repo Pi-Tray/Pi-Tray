@@ -4,7 +4,7 @@ A ready-to-flash Raspberry Pi OS Lite image that boots straight into the [Pi-Tra
 
 It runs well on a 1GB Pi: there's no desktop, just Chromium on a bare X server. You can of course skip this image and set up Pi-Tray Client however you like, but the image is a convenient and lightweight way to get going.
 
-You'll also need [Pi-Tray Server](../server) running on the PC you want to control.
+You'll also need [Pi-Tray](../../README.md#getting-started) installed on the PC you want to control.
 
 ## What's in the image
 
@@ -45,10 +45,10 @@ Imager doesn't apply its settings to images chosen through **Use Custom**, even 
 
 ## Pointing it at your PC
 
-Before booting, open the SD card's **bootfs** drive on any computer and edit `pi-tray.txt`. Set it to your PC's address and the server's port:
+Before booting, open the SD card's **bootfs** drive on any computer and edit `pi-tray.txt`. Set it to your PC's address and the server's port, which is `31415` unless you've changed it:
 
 ```
-ws://192.168.1.50:8080
+ws://192.168.1.50:31415
 ```
 
 Use `wss://` only if you've set up TLS on the server. Lines starting with `#` are ignored.
@@ -68,7 +68,7 @@ If the Pi is plugged straight into your PC rather than a router, there's nothing
         - 192.168.50.2/24
 ```
 
-Then give your PC's ethernet adapter `192.168.50.1` with subnet mask `255.255.255.0`, and set `pi-tray.txt` to `ws://192.168.50.1:8080`.
+Then give your PC's ethernet adapter `192.168.50.1` with subnet mask `255.255.255.0`, and set `pi-tray.txt` to `ws://192.168.50.1:31415`, which is what it's set to already.
 
 This file is only read on the first boot. To change it afterwards, reflash or use `nmtui` over SSH.
 
@@ -134,7 +134,7 @@ While it starts, the screen shows a short message with the Pi's IP address. If t
 
 If the screen shows **Connecting...** and stays there:
 
-- Check the server is running, and listening on an address the Pi can reach (`--host=` matching your PC's IP, not `127.0.0.1`).
+- Check Pi-Tray is running on your PC, and that the `host` in its [`server.json`](../server/README.md#settings) isn't `127.0.0.1`. The default, `0.0.0.0`, works.
 - Check your PC's firewall allows the server's port. Windows blocks inbound connections on networks marked Public by default, which includes direct ethernet connections.
 - Check the address in `pi-tray.txt`.
 

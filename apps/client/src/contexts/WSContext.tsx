@@ -29,7 +29,7 @@ export type ChannelStatus = "connecting" | "encrypting" | "authenticating" | "pa
 export interface Channel {
     status: ChannelStatus;
 
-    /** The url the channel connected to, e.g. ws://192.168.50.1:8080, for resolving server asset paths. */
+    /** The url the channel connected to, e.g. ws://192.168.50.1:31415, for resolving server asset paths. */
     url: string;
 
     /** Encrypts and sends a message. Drops it (with a log) if the channel isn't ready yet. */

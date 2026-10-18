@@ -12,7 +12,7 @@ import {ServerMessage} from "@pi-tray/types";
  * Resolves an asset path from the server (e.g. `/assets/<id>.png?v=123`) against the server's address.<br>
  * Anything that would load from a different origin is rejected.
  * @param asset_path the path from the server, or null for no image
- * @param socket_url the websocket's url, e.g. ws://192.168.50.1:8080
+ * @param socket_url the websocket's url, e.g. ws://192.168.50.1:31415
  * @returns the full http url, or an empty string for no image
  */
 const resolve_asset_url = (asset_path: string | null | undefined, socket_url: string): string => {

@@ -19,7 +19,7 @@ export type ChannelStatus = "connecting" | "encrypting" | "ready" | "closed";
 export interface Channel {
     status: ChannelStatus;
 
-    /** The url the channel connected to, e.g. ws://localhost:8080. */
+    /** The url the channel connected to, e.g. ws://localhost:31415. */
     url: string;
 
     /** Encrypts and sends a message. Drops it (with a log) if the channel isn't ready yet. */

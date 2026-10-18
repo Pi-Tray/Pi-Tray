@@ -5,52 +5,52 @@
 
 ---
 
-this readme needs to be done properly, but this isnt in working order yet so come back later :)
+Runs on your PC. It serves the button grid to paired devices, runs a button's plugin when it's pressed, and keeps live buttons, like a clock, up to date.
 
-once the editor program gets up and running, its going to manage a bit of this for you, especially plugin-env
+You don't normally run it yourself: the [`pi-tray` CLI](../cli), which the editor installs, runs it under the supervisor, which restarts it when asked and can start it at login.
 
-## Setup (make this better and update for monorepo properly)
+## Connections
 
-1. Clone the monorepo:
-   ```bash
-    git clone https://github.com/Pi-Tray/Pi-Tray.git
-    cd pi-tray
-    ```
-2. Install dependencies:
-   ```bash
-   pnpm install
-   ```
-3. Generate `plugin-env`:
-   ```bash
-   pnpm run plugin:setup
-   ```
-4. Decide on a port you want the server to run on. By default this is 8080.
-5. Create a connection between the Pi and the computer the server runs on. For me, I connect the Pi directly over Ethernet and assign it a static IP. (I should really do a writeup about this)
-6. Determine the IP address of the interface that connects to your Pi. You probably don't want to be serving this on the public Internet, so I'd avoid `0.0.0.0`. Ths interface IP will be the same one you assigned to the interface if you used a direct connection.
-7. You can now run the server with:
-   ```bash
-   npm run start -- -- --host=<host-ip> --port=<port>
-   ``` 
-   You'll probably want to run this at startup, but that depends on your OS.
-8. You can now configure and subsequently build the [Pi-Tray client](https://github.com/Pi-Tray/client) to connect to this server by setting the `VITE_WS_URL` environment variable in the client. This should be the URL of the server you just started, i.e., `ws://<host-ip>:<port>`.
-9. Ensure the Pi can actually access the server! If you're directly connected, you'll probably need to make an exception in your OS firewall to allow the Pi to send inbound traffic on the port you chose.
+Devices connect over WebSocket. Every connection is encrypted and authenticated, and a new device has to be paired before it can do anything: it shows a code on its screen, and you enter that code in the editor's **Devices** page.
 
-## Installing plugins
+## Settings
 
-You can use the `npm run plugin:npm` command in the server's root to run npm in the `plugin-env` directory.
+The server reads `server.json` in Pi-Tray's data folder:
 
-For example, you can install a plugin with your package manager following its README, e.g.
-```bash
-npm run plugin:npm install https://github.com/Pi-Tray/ghost-plugins#release
- ```
+| Platform | Data folder |
+| --- | --- |
+| Windows | `%APPDATA%\pi-tray` |
+| macOS | `~/Library/Application Support/pi-tray` |
+| Linux | `~/.config/pi-tray` |
 
-Alternatively, follow the next section to change directly into the `plugin-env` directory and run npm commands normally there.
-
-## Changing into the `plugin-env`:
-
-Bash / PowerShell:
-```bash
-cd "$(npm run where:plugin-env --silent)"
+```json
+{
+    "host": "0.0.0.0",
+    "port": 31415,
+    "allowed_networks": ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "169.254.0.0/16", "::1/128", "fc00::/7", "fe80::/10"]
+}
 ```
 
-Manual: copy the output of `npm run where:plugin-env --silent` and `cd` into that directory.
+- **host**: the address to listen on. `0.0.0.0` listens on every network the PC is on. Use the address of the network your Pi is on to only listen there.
+- **port**: the default is `31415`.
+- **allowed_networks**: connections from anywhere else are refused before they get as far as pairing. The default is this PC, private networks and direct ethernet, never the internet.
+
+Anything missing or invalid uses the default. `--host` and `--port` override the file for one run.
+
+Your PC's firewall has to allow inbound connections on the port. Windows blocks them by default on networks marked Public, which includes direct ethernet connections.
+
+## Plugins
+
+Plugins are loaded from packages installed in the data folder's `plugins` folder, by the editor's **Plugin Manager** or `pi-tray package install`. Only installed packages are loaded, and a package's data folder (for things like saved logins) is in `plugin-data`, so it's kept when the package is updated or reinstalled.
+
+## Development
+
+From the root of the monorepo:
+
+```bash
+pnpm install
+pnpm --filter @pi-tray/server dev       # only this PC can connect
+pnpm --filter @pi-tray/server dev:lan   # uses the host in server.json
+```
+
+Both reload when the source changes.
