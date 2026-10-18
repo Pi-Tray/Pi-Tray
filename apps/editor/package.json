@@ -16,6 +16,7 @@
         "@pi-tray/types": "workspace:*",
         "@pi-tray/secure-channel": "workspace:*",
         "@pi-tray/package-spec": "workspace:*",
+        "@pi-tray/server-config": "workspace:*",
         "@fontsource-variable/dm-sans": "^5.2.6",
         "@tailwindcss/vite": "^4.1.11",
         "@tauri-apps/api": "^2.7.0",

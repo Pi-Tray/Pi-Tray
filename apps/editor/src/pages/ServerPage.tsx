@@ -4,6 +4,7 @@ import {Link} from "wouter";
 
 import {SupervisorControl, useSupervisor} from "../contexts/SupervisorProvider";
 import {useAutostart} from "../util/autostart";
+import {ServerConfigForm} from "../components/ServerConfigForm.tsx";
 
 interface ServerSummary {
     text: string;
@@ -132,7 +133,7 @@ export const ServerPage = () => {
     }
 
     return (
-        <div className="flex flex-col gap-10 items-start justify-start">
+        <div className="flex flex-col gap-10 items-start justify-start pb-8">
             <h1 className="text-2xl font-bold">Server</h1>
 
             <div className="flex items-center gap-3">
@@ -195,9 +196,9 @@ export const ServerPage = () => {
                         />
                     </label>
                     {autostart.error && <p className="text-xs text-error">{autostart.error}</p>}
-
-                    TODO: host, port, allowed hosts
                 </div>
+
+                <ServerConfigForm />
             </div>
 
             <div className="flex flex-col gap-4">

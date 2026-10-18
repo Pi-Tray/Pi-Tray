@@ -164,6 +164,9 @@ importers:
       '@pi-tray/secure-channel':
         specifier: workspace:*
         version: link:../../packages/secure-channel
+      '@pi-tray/server-config':
+        specifier: workspace:*
+        version: link:../../packages/server-config
       '@pi-tray/types':
         specifier: workspace:*
         version: link:../../packages/types
