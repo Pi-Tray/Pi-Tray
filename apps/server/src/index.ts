@@ -26,6 +26,7 @@ import {load_server_config} from "./config";
 import * as _handlers from "./handlers";
 import {create_address_filter} from "./network_filter";
 import {register_for_shutdown} from "./shutdown";
+import {app_version} from "./version";
 const handlers: { [action: string]: MessageHandler | undefined } = _handlers;
 Object.freeze(handlers);
 
@@ -246,7 +247,7 @@ http_server.on("error", (error: NodeJS.ErrnoException) => {
 });
 
 http_server.on("listening", () => {
-    console.log(`Server is listening on ws://${host}:${port}`);
+    console.log(`Pi-Tray ${app_version} server is listening on ws://${host}:${port}`);
 
     let effective_host = host;
     if (effective_host === "0.0.0.0" || effective_host === "::") {

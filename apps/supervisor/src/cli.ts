@@ -61,6 +61,11 @@ export interface SupervisorCliOptions {
      * The command that starts this supervisor, for starting it at login. Defaults to node running this script.
      */
     launch_command?: string[];
+
+    /**
+     * The version to report with every status, e.g. Pi-Tray's when it's part of the CLI.
+     */
+    version?: string;
 }
 
 /**
@@ -115,7 +120,7 @@ export const run_supervisor_cli = (argv: string[], options: SupervisorCliOptions
         }
 
         try {
-            await open_control_channel(server_process, quit);
+            await open_control_channel(server_process, quit, options.version);
         } catch (error) {
             if (error instanceof SupervisorAlreadyRunningError) {
                 log("Another supervisor is already running, exiting");

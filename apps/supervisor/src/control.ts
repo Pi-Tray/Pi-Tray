@@ -1,5 +1,6 @@
 import fs from "fs";
 import net from "net";
+import path from "path";
 
 import {is_supervisor_command, supervisor_pipe_path, SupervisorCommand, SupervisorResponse} from "./constants";
 import type {ServerProcess} from "./server_process";
@@ -42,9 +43,10 @@ const send_line = (socket: net.Socket, response: SupervisorResponse) => {
  * Listens for commands from the editor or the command line, one line of JSON per request.
  * @param server_process the server to control
  * @param quit called when told to quit, after the reply is sent
+ * @param version this supervisor's version, sent with every status so the editor can tell when it's out of date
  * @throws SupervisorAlreadyRunningError if another supervisor has the pipe
  */
-export const open_control_channel = async (server_process: ServerProcess, quit: () => void): Promise<net.Server> => {
+export const open_control_channel = async (server_process: ServerProcess, quit: () => void, version?: string): Promise<net.Server> => {
     const pipe_path = supervisor_pipe_path();
 
     const handle_command = (socket: net.Socket, command: SupervisorCommand) => {
@@ -62,18 +64,18 @@ export const open_control_channel = async (server_process: ServerProcess, quit: 
                 break;
             case "watch": {
                 // keeps the connection open, sending the status now and after every change
-                const remove_listener = server_process.add_status_listener((status) => send_line(socket, {ok: true, status}));
+                const remove_listener = server_process.add_status_listener((status) => send_line(socket, {ok: true, status, version}));
                 socket.once("close", remove_listener);
                 break;
             }
             case "quit":
-                send_line(socket, {ok: true, status: server_process.get_status()});
+                send_line(socket, {ok: true, status: server_process.get_status(), version});
                 socket.end();
                 quit();
                 return;
         }
 
-        send_line(socket, {ok: true, status: server_process.get_status()});
+        send_line(socket, {ok: true, status: server_process.get_status(), version});
     }
 
     const control_server = net.createServer((socket) => {
@@ -113,6 +115,11 @@ export const open_control_channel = async (server_process: ServerProcess, quit: 
             }
         });
     });
+
+    if (process.platform !== "win32") {
+        // the socket lives in the data folder, which the server only creates once it starts, after this
+        fs.mkdirSync(path.dirname(pipe_path), {recursive: true, mode: 0o700});
+    }
 
     try {
         await listen(control_server, pipe_path);

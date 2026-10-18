@@ -1,6 +1,5 @@
 {
     "name": "@pi-tray/cli",
-    "version": "0.1.0",
     "private": true,
     "description": "The server, the supervisor and package manager in one executable, so they share one copy of Node.js",
     "main": "dist/index.js",

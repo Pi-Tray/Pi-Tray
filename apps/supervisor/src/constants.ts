@@ -69,5 +69,5 @@ export interface SupervisorRequest {
  * Sent back as one line of JSON. "watch" keeps the connection open and sends one of these for every change.
  */
 export type SupervisorResponse =
-    | {ok: true, status: SupervisorStatus}
+    | {ok: true, status: SupervisorStatus, version?: string}
     | {ok: false, error: string};

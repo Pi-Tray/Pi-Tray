@@ -1,6 +1,5 @@
 {
     "name": "@pi-tray/supervisor",
-    "version": "0.1.0",
     "private": true,
     "description": "Keeps the Pi-Tray server running, restarts it on request, and starts it at login",
     "main": "./src/constants.ts",

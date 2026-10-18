@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "bundle-v*"
+      - "v*"
     # changes to any of the apps or packages that are included in the bundle should trigger a rebuild to sanity check
     branches:
       - main
@@ -17,6 +17,12 @@ on:
       - "packages/types/**"
       - "packages/secure-channel/**"
       - "packages/paths/**"
+      - "packages/installer/**"
+      - "packages/package-spec/**"
+      - "packages/server-config/**"
+      - "packages/ui/**"
+      - "scripts/**"
+      - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/build-bundle.yml"
 
@@ -36,9 +42,19 @@ jobs:
       should_publish: ${{ steps.determine.outputs.should_publish }}
       release_tag: ${{ steps.determine.outputs.release_tag }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - id: determine
         run: |
           if [ "${{ github.ref_type }}" = "tag" ]; then
+            # the version comes from the root package.json, so a tag that doesn't match would publish mislabelled builds
+            app_version="$(node -p "require('./package.json').version")"
+            if [ "${{ github.ref_name }}" != "v$app_version" ]; then
+              echo "::error::Tag ${{ github.ref_name }} doesn't match the version in package.json (v$app_version). Run node scripts/set-version.mjs first"
+              exit 1
+            fi
+
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
             echo "release_tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           else

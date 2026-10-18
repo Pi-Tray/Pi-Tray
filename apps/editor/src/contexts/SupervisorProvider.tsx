@@ -1,5 +1,6 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {Child, Command} from "@tauri-apps/plugin-shell";
+import {getVersion} from "@tauri-apps/api/app";
 
 // the supervisor's replies, as "pi-tray <command> --json" prints them. written out here rather than imported from
 // @pi-tray/supervisor, which is node code the webview can't load
@@ -30,7 +31,8 @@ export interface SupervisorStatus {
     last_exit: ServerExit | null;
 }
 
-type SupervisorResponse = {ok: true, status: SupervisorStatus} | {ok: false, error: string};
+// version is missing from supervisors older than when it was added
+type SupervisorResponse = {ok: true, status: SupervisorStatus, version?: string} | {ok: false, error: string};
 
 /**
  * - connecting: waiting for the first reply from the supervisor
@@ -49,6 +51,18 @@ export interface SupervisorControl {
 
     /** The server's status while connected, otherwise null */
     status: SupervisorStatus | null;
+
+    /** The running supervisor's version, or null if it isn't connected or is too old to say */
+    supervisor_version: string | null;
+
+    /** This editor's version, the one its bundled CLI was built as, or null until it's been read */
+    editor_version: string | null;
+
+    /**
+     * The running supervisor isn't this editor's version, e.g. Pi-Tray was updated without restarting it,
+     * or it's an installed copy while this is a dev build. Restarting it (stop, then start) runs this editor's copy
+     */
+    version_mismatch: boolean;
 
     /** The action being carried out, if any, e.g. to disable buttons while it runs */
     pending_action: ServerAction | "launch" | null;
@@ -126,6 +140,12 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
     const [connection, setConnection] = useState<SupervisorConnection>("connecting");
     const [status, setStatus] = useState<SupervisorStatus | null>(null);
     const [pending_action, setPendingAction] = useState<ServerAction | "launch" | null>(null);
+    const [supervisor_version, setSupervisorVersion] = useState<string | null>(null);
+    const [editor_version, setEditorVersion] = useState<string | null>(null);
+
+    useEffect(() => {
+        getVersion().then(setEditorVersion).catch((error) => console.error("Couldn't read the editor's version:", error));
+    }, []);
 
     const watch_child = useRef<Child | null>(null);
     const retry_timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -161,11 +181,13 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
     const handle_watch_response = useCallback((response: SupervisorResponse) => {
         if (response.ok) {
             handle_status(response.status);
+            setSupervisorVersion(response.version ?? null);
         } else {
             // the watch fails straight away when there's no supervisor to watch
             console.warn("pi-tray watch:", response.error);
             setConnection("not_running");
             setStatus(null);
+            setSupervisorVersion(null);
         }
     }, [handle_status]);
 
@@ -192,6 +214,7 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
             if (!disposed.current) {
                 setConnection("not_running");
                 setStatus(null);
+                setSupervisorVersion(null);
                 retry_timeout.current = setTimeout(() => void start_watch(), delay_ms);
             }
         };
@@ -321,9 +344,12 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
     // the supervisor replies, then quits, which ends the watch and shows it as not running
     const stop = useCallback(() => run_action("quit"), [run_action]);
 
+    // a supervisor too old to report its version also counts, as it's certainly not this editor's
+    const version_mismatch = connection === "connected" && editor_version !== null && supervisor_version !== editor_version;
+
     const control = useMemo<SupervisorControl>(
-        () => ({connection, status, pending_action, start, stop, run_action, launch}),
-        [connection, status, pending_action, start, stop, run_action, launch]
+        () => ({connection, status, supervisor_version, editor_version, version_mismatch, pending_action, start, stop, run_action, launch}),
+        [connection, status, supervisor_version, editor_version, version_mismatch, pending_action, start, stop, run_action, launch]
     );
 
     return (

@@ -2,6 +2,8 @@ import minimist from "minimist";
 import {spawn} from "child_process";
 import * as path from "node:path";
 
+import {app_version} from "./version";
+
 const program_name = "pi-tray";
 
 // how to run this executable again: on its own when packaged, otherwise node with the same flags (e.g. tsx's) and this script
@@ -23,7 +25,8 @@ const run_supervisor_cli = (supervisor_argv: string[]) => {
         // a packaged executable starting itself runs as plain node unless PKG_EXECPATH is set to something else,
         // so this makes it run this app. no effect outside pkg
         server_env: {PKG_EXECPATH: ""},
-        launch_command: [...self_command, "supervise"]
+        launch_command: [...self_command, "supervise"],
+        version: app_version
     });
 };
 
@@ -116,7 +119,7 @@ const commands: Command[] = [
 const find_command = (name: string) => commands.find((command) => command.name === name);
 
 const general_help = () => {
-    const usage_width = Math.max(...commands.map((command) => command.usage.length), "-h, --help".length) + 4;
+    const usage_width = Math.max(...commands.map((command) => command.usage.length), "-v, --version".length) + 4;
     const groups = [...new Set(commands.map((command) => command.group))];
 
     const lines = [
@@ -137,6 +140,7 @@ const general_help = () => {
     lines.push(
         "Options:",
         `  ${"-h, --help".padEnd(usage_width)}show this help`,
+        `  ${"-v, --version".padEnd(usage_width)}show the version of Pi-Tray`,
         "",
         `Run "${program_name} help <command>" for a command's usage.`
     );
@@ -160,8 +164,8 @@ const unknown_options: string[] = [];
 
 // stopEarly leaves everything after the command untouched, so each app parses its own arguments
 const options = minimist(process.argv.slice(2), {
-    boolean: ["help"],
-    alias: {h: "help"},
+    boolean: ["help", "version"],
+    alias: {h: "help", v: "version"},
     stopEarly: true,
     unknown: (arg) => {
         if (arg.startsWith("-")) {
@@ -179,6 +183,8 @@ if (unknown_options.length > 0) {
     fail(`unknown option${unknown_options.length > 1 ? "s" : ""}: ${unknown_options.join(", ")}`);
 } else if (options.help) {
     console.log(general_help());
+} else if (options.version) {
+    console.log(app_version);
 } else if (command_name === undefined) {
     console.error(general_help());
     process.exitCode = 2;

@@ -155,6 +155,16 @@ export const ServerPage = () => {
                 </div>
             </div>
 
+            {supervisor.version_mismatch && (
+                <div role="alert" className="alert alert-warning">
+                    <TriangleAlert className="w-5 h-5" />
+                    <span>
+                        The background service is running Pi-Tray {supervisor.supervisor_version ?? "from an older version"}, but this editor is {supervisor.editor_version}.
+                        Stop and start it to run this version.
+                    </span>
+                </div>
+            )}
+
             <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold">Actions</h2>
 

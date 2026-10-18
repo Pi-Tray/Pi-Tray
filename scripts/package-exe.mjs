@@ -10,6 +10,7 @@ import {exec as run_pkg} from "@yao-pkg/pkg";
 import * as PE from "pe-library";
 import * as ResEdit from "resedit";
 
+import {app_version as get_app_version} from "./app-version.mjs";
 import {node_major} from "./node-version.mjs";
 import {target_triple as get_target_triple} from "./target-triple.mjs";
 
@@ -88,7 +89,8 @@ if (is_windows) {
     const exe = PE.NtExecutable.from(fs.readFileSync(exe_path), {ignoreCert: true});
     const resources = PE.NtExecutableResource.from(exe);
 
-    const app_version = JSON.parse(fs.readFileSync("package.json", "utf8")).version ?? "0.0.0";
+    // Pi-Tray's version, which every app it packages shares
+    const app_version = get_app_version();
     const [major, minor, patch] = app_version.split(/[.-]/).map((part) => Number(part) || 0);
 
     const version_info = ResEdit.Resource.VersionInfo.fromEntries(resources.entries)[0];

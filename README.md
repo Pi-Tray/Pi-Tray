@@ -74,10 +74,12 @@ Releases are made by GitHub Actions when a tag is pushed:
 
 | Tag               | Releases                                                                                  |
 |-------------------|-------------------------------------------------------------------------------------------|
-| `bundle-v*`       | The app (editor and CLI) for Windows, macOS and Linux, also kept as `editor-latest`       |
+| `v*`              | The app (editor and CLI) for Windows, macOS and Linux, also kept as `editor-latest`       |
 | `image-v*`        | The Raspberry Pi image                                                                    |
 | `types-v*`        | `@pi-tray/types`, for plugins to build against                                            |
 | `plugin-build-v*` | `@pi-tray/plugin-build`, and moves the `plugin-build-v<major>` tag plugins' workflows use |
+
+The app's version is the one in the root `package.json`, used by the editor, CLI, server and client alike. To release, run `node scripts/set-version.mjs <version>` (which also updates the editor's `Cargo.toml`), commit, and tag the commit `v<version>`. The build fails if the tag doesn't match.
 
 ---
 
