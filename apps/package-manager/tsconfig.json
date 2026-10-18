@@ -1,0 +1,13 @@
+{
+    // only for type checking: whatever runs or bundles this compiles it from source
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "commonjs",
+        "moduleResolution": "node",
+        "noEmit": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true
+    },
+    "include": ["src"]
+}

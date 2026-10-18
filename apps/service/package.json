@@ -12,7 +12,7 @@
     "dependencies": {
         "@pi-tray/server": "workspace:*",
         "@pi-tray/supervisor": "workspace:*",
-        "@pi-tray/installer": "workspace:*"
+        "@pi-tray/package-manager": "workspace:*"
     },
     "devDependencies": {
         "@types/node": "catalog:",

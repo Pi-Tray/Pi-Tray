@@ -1,0 +1,23 @@
+{
+    "name": "@pi-tray/package-manager",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Installs, removes and describes plugin packages for the editor.",
+    "main": "./src/cli.ts",
+    "exports": {
+        "./cli": "./src/cli.ts"
+    },
+    "scripts": {
+        "start": "tsx src/index.ts"
+    },
+    "dependencies": {
+        "@pi-tray/installer": "workspace:*",
+        "@pi-tray/paths": "workspace:*",
+        "@pi-tray/types": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "catalog:",
+        "typescript": "catalog:",
+        "tsx": "catalog:"
+    }
+}

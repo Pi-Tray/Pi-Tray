@@ -1,4 +1,4 @@
-// answers the editor's questions about installed plugin packages, run as "pi-tray-service package info <package>"
+// what the editor asks about installed plugin packages, run as "pi-tray-service package info <package>"
 
 import {createRequire} from "module";
 import path from "path";

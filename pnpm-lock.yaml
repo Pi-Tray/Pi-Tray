@@ -210,6 +210,28 @@ importers:
         specifier: ^6.0.3
         version: 6.4.4(@types/node@24.19.2)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15)
 
+  apps/package-manager:
+    dependencies:
+      '@pi-tray/installer':
+        specifier: workspace:*
+        version: link:../../packages/installer
+      '@pi-tray/paths':
+        specifier: workspace:*
+        version: link:../../packages/paths
+      '@pi-tray/types':
+        specifier: workspace:*
+        version: link:../../packages/types
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.19.2
+      tsx:
+        specifier: 'catalog:'
+        version: 4.23.15
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   apps/server:
     dependencies:
       '@pi-tray/installer':
@@ -252,9 +274,9 @@ importers:
 
   apps/service:
     dependencies:
-      '@pi-tray/installer':
+      '@pi-tray/package-manager':
         specifier: workspace:*
-        version: link:../../packages/installer
+        version: link:../package-manager
       '@pi-tray/server':
         specifier: workspace:*
         version: link:../server
