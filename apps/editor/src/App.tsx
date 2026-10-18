@@ -18,6 +18,7 @@ import {onOpenUrl} from "@tauri-apps/plugin-deep-link";
 import {getCurrentWindow} from "@tauri-apps/api/window";
 import {AutostartPrompt} from "./components/AutostartPrompt";
 import {confirm_and_install} from "./util/install_flow";
+import {parse_spec} from "@pi-tray/package-spec";
 
 /**
  * A wrapper component that conditionally renders the WebSocket provider based on the provided URL.<br>
@@ -70,41 +71,32 @@ const App = () => {
                     console.log(`Navigating to page: ${page}`);
                     navigate(`/${page}`);
                     break;
-                case "express":
-                    // lookup the plugin name from the express install list
-                    // if its not present, dont attempt to install it for security reasons
-                    // other plugins should be installed through the plugin manager instead to make it more intentional
+                case "install": {
+                    // pi-tray://install?spec=<encoded spec>. links from websites get the same confirmation as installing by hand, and can never install a file from this computer, e.g. one a site has just downloaded
+                    const spec = url.searchParams.get("spec");
+                    const parsed = spec ? parse_spec(spec) : null;
 
-                    const name = fragments.join("/");
-                    const express_list = await fetch("https://raw.githubusercontent.com/Pi-Tray/express-list/refs/heads/main/express.json");
-
-                    if (!express_list.ok) {
-                        console.error("Failed to fetch express list:", express_list.statusText);
-                        return;
+                    if (!spec || !parsed || !parsed.ok) {
+                        alert(`This link doesn't say what to install${parsed && !parsed.ok ? `: ${parsed.error}` : ""}`);
+                        break;
                     }
 
-                    const express_data = await express_list.json();
-                    if (!express_data[name]) {
-                        console.error(`Plugin "${name}" not found in express list.`);
-                        return;
+                    if (parsed.source.kind === "file") {
+                        alert("Links can't install files from your computer, install it from the plugin manager instead.");
+                        break;
                     }
 
-                    // TODO: show user that this is happening
-
-                    // install the plugin
                     // TODO: use proper toasts
                     try {
-                        const package_ref = express_data[name];
-                        console.log(`Installing plugin from express list: ${name} (${package_ref})`);
-                        if (await confirm_and_install(package_ref)) {
-                            alert(`Plugin "${name}" installed successfully!`);
+                        if (await confirm_and_install(spec)) {
+                            alert("Package installed.");
                         }
                     } catch (error) {
-                        console.error("Failed to install plugin from express list:", error);
-                        alert(`Failed to install plugin "${name}". Check the console for details.`);
+                        alert(`Couldn't install the package: ${error instanceof Error ? error.message : String(error)}`);
                     }
 
                     break;
+                }
             }
         },
         [navigate]
