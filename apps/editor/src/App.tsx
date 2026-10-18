@@ -67,7 +67,7 @@ const App = () => {
             switch (command) {
                 case "page":
                     // navigate to the page specified in the deep link
-                    const page = fragments.join("");
+                    const page = fragments.join("/");
                     console.log(`Navigating to page: ${page}`);
                     navigate(`/${page}`);
                     break;
