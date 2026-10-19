@@ -7,7 +7,7 @@ import {clear_plugin_cache} from "../plugins";
  * Useful while developing a plugin, since plugins otherwise stay loaded until plugin-env's packages change.
  */
 export default (async (client, payload) => {
-    clear_plugin_cache();
+    await clear_plugin_cache();
 
     client.send({
         action: "plugins_reloaded"

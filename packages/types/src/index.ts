@@ -240,6 +240,14 @@ export interface Plugin<Controls extends PluginLiveControllable = PluginLiveCont
      * Properties for live plugins.
      */
     live?: PluginLiveConfig<Controls>;
+
+    /**
+     * Optional cleanup for anything the plugin holds outside a single tile, e.g. a shared connection or a module-level timer.<br>
+     * Called before the plugin's code is dropped: when plugins are reloaded, a package is installed or removed, or the server stops.
+     * By then every live tile from this plugin has already been stopped. Only called if the plugin was loaded, and not if the
+     * server crashes or is killed. The server waits at most 2 seconds at most for a returned promise.
+     */
+    dispose?(): void | Promise<void>;
 }
 
 export * from "./assets.js";

@@ -18,40 +18,103 @@ const loaded_plugins = new Map<string, Plugin>();
 // so clearing the cache also catches dependencies that resolve outside the plugin's folder
 const plugin_module_paths = new Set<string>();
 
-const cache_clear_listeners = new Set<() => void>();
+// how long a plugin's dispose gets before it's given up on, so one stuck plugin can't hold up a reload or shutdown
+const DISPOSE_TIMEOUT_MS = 2000;
+
+const stop_listeners = new Set<() => void>();
+const cleared_listeners = new Set<() => void>();
+
+// clears run one after another, so a reload and an install landing together can't interleave
+let clearing: Promise<void> = Promise.resolve();
+
+const call_listeners = (listeners: Set<() => void>) => {
+    for (const listener of listeners) {
+        try {
+            listener();
+        } catch (error) {
+            console.error("Error in plugin cache listener:", error);
+        }
+    }
+}
 
 /**
- * Calls the listener just before the plugin cache is cleared, e.g. so running live tiles can be stopped.
+ * Calls the listener before the loaded plugins are disposed, when the cache is cleared or the server stops,
+ * e.g. so running live tiles can be stopped first.
  * @param listener the listener to add
  * @returns a function that removes the listener
  */
-export const add_plugin_cache_clear_listener = (listener: () => void): (() => void) => {
-    cache_clear_listeners.add(listener);
+export const add_plugin_stop_listener = (listener: () => void): (() => void) => {
+    stop_listeners.add(listener);
     return () => {
-        cache_clear_listeners.delete(listener);
+        stop_listeners.delete(listener);
     };
 }
 
 /**
- * Forgets every loaded plugin and removes their modules from the require cache.<br>
+ * Calls the listener once the plugin cache has been cleared, e.g. so live tiles can be started again from the fresh code.
+ * @param listener the listener to add
+ * @returns a function that removes the listener
+ */
+export const add_plugin_cache_cleared_listener = (listener: () => void): (() => void) => {
+    cleared_listeners.add(listener);
+    return () => {
+        cleared_listeners.delete(listener);
+    };
+}
+
+const dispose_plugin = async (name: string, plugin: Plugin) => {
+    if (!plugin.dispose) {
+        return;
+    }
+
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        await Promise.race([
+            // also catches a dispose that throws rather than rejecting
+            Promise.resolve().then(() => plugin.dispose!()),
+            new Promise<never>((_, reject) => {
+                timeout = setTimeout(() => reject(new Error(`didn't finish within ${DISPOSE_TIMEOUT_MS}ms`)), DISPOSE_TIMEOUT_MS);
+            })
+        ]);
+    } catch (error) {
+        console.error(`Error disposing plugin ${name}:`, error);
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+/**
+ * Stops everything using the loaded plugins, then disposes each of them. They stay loaded, so this is either followed by
+ * forgetting them (see {@link clear_plugin_cache}) or by the server exiting.
+ */
+export const stop_loaded_plugins = async () => {
+    call_listeners(stop_listeners);
+
+    // independent of each other, so disposed together, which also keeps the total wait to one timeout
+    await Promise.all([...loaded_plugins].map(([name, plugin]) => dispose_plugin(name, plugin)));
+}
+
+/**
+ * Disposes and forgets every loaded plugin, and removes their modules from the require cache.<br>
  * The next {@link load_plugin} call for each plugin will load it fresh from disk, re-running its top level code.
  */
-export const clear_plugin_cache = () => {
-    for (const listener of cache_clear_listeners) {
-        try {
-            listener();
-        } catch (error) {
-            console.error("Error in plugin cache clear listener:", error);
+export const clear_plugin_cache = (): Promise<void> => {
+    clearing = clearing.then(async () => {
+        await stop_loaded_plugins();
+
+        loaded_plugins.clear();
+
+        for (const module_path of plugin_module_paths) {
+            delete require_plugin.cache[module_path];
         }
-    }
 
-    loaded_plugins.clear();
+        plugin_module_paths.clear();
 
-    for (const module_path of plugin_module_paths) {
-        delete require_plugin.cache[module_path];
-    }
+        call_listeners(cleared_listeners);
+    });
 
-    plugin_module_paths.clear();
+    return clearing;
 }
 
 // what's installed, re-read whenever the package manager changes it, so a folder it didn't install is never loaded
@@ -112,5 +175,5 @@ export const load_plugin = (name: string) => {
 fs.watchFile(installed_file, {interval: 1000}, () => {
     console.log("Installed packages changed, clearing plugin cache.");
     installed_packages = null;
-    clear_plugin_cache();
+    void clear_plugin_cache();
 });

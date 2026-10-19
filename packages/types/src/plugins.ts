@@ -27,6 +27,10 @@ export const find_plugin_problems = (plugin: any): string[] => {
         return ["the default export isn't an object"];
     }
 
+    if (plugin.dispose !== undefined && typeof plugin.dispose !== "function") {
+        problems.push("dispose must be a function");
+    }
+
     if (plugin.handle_push !== undefined && typeof plugin.handle_push !== "function") {
         problems.push("handle_push must be a function");
     }

@@ -1,5 +1,6 @@
 import type {Server} from "http";
 import type {WebSocketServer} from "ws";
+import {stop_loaded_plugins} from "./plugins";
 
 // from sysexits.h, "temporary failure, try again" (used for restart request)
 const EX_TEMPFAIL = 75;
@@ -38,7 +39,11 @@ export const shutdown_server = (exit_code: number) => {
         client.close(close_code);
     }
 
-    registered_servers.http_server.close(() => process.exit(exit_code));
+    // the plugins are disposed while the connections close, and it exits once both are done
+    const {http_server} = registered_servers;
+    const connections_closed = new Promise<void>((resolve) => http_server.close(() => resolve()));
+
+    void Promise.all([stop_loaded_plugins(), connections_closed]).then(() => process.exit(exit_code));
 }
 
 /**

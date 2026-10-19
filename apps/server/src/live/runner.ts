@@ -1,7 +1,11 @@
 import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS, unwrap_plugin_reference} from "../types";
 
 import {add_grid_change_listener, get_loaded_grid} from "../data";
-import {add_plugin_cache_clear_listener, load_plugin} from "../plugins";
+import {
+    add_plugin_cache_cleared_listener,
+    add_plugin_stop_listener,
+    load_plugin
+} from "../plugins";
 import {clear_live_state, LiveCellState, set_live_state} from "./state";
 import {plugin_context, set_tile_error_handler} from "../plugin_context";
 import {package_data_folder} from "@pi-tray/installer/read";
@@ -340,12 +344,12 @@ set_tile_error_handler((context, error) => {
 // a changed cell may need its tile started, stopped or restarted
 add_grid_change_listener(async () => reconcile_live_tiles());
 
-// stop every tile before the plugins are unloaded, then start them again from the fresh code
-add_plugin_cache_clear_listener(() => {
+// stop every tile before the plugins are disposed, on a reload or when the server stops
+add_plugin_stop_listener(() => {
     for (const key of [...running_tiles.keys()]) {
         stop_tile(key);
     }
-
-    // the cache is cleared synchronously after this listener, so reconciling in a microtask uses the new code
-    queueMicrotask(reconcile_live_tiles);
 });
+
+// then start them again from the fresh code, once the old code is gone
+add_plugin_cache_cleared_listener(() => void reconcile_live_tiles());
