@@ -2,6 +2,8 @@ import {InstalledRegistry, read_installed} from "./installed";
 import {parse_spec} from "@pi-tray/package-spec";
 import {resolve_package, ResolvedPackage} from "./resolve";
 import semver from "semver";
+import {with_install_lock} from "./lock";
+import {install_resolved_package, PackageInUseError} from "./install";
 
 export interface UpdateCheckResult {
     name: string;
@@ -113,4 +115,85 @@ export const check_updates = async (names?: string[]): Promise<UpdateCheckResult
 
     const result_promises = names.map((name) => check_update(name, installed));
     return Promise.all(result_promises);
+}
+
+export interface UpdateResult {
+    name: string;
+
+    previous_version: string | null;
+    installed_version: string | null;
+
+    status: "updated" | "in_use" | UpdateCheckResult["status"];
+    error?: string;
+}
+
+const update_one = async (update: FoundUpdate): Promise<UpdateResult> => {
+    const {name, installed_version} = update.result;
+
+    // nothing changes unless it installs, so every other outcome reports what's already there
+    const unchanged = (status: UpdateResult["status"], error?: string): UpdateResult => ({
+        name,
+        previous_version: installed_version,
+        installed_version,
+        status,
+        error
+    });
+
+    if (update.result.status !== "update_available") {
+        return unchanged(update.result.status, update.result.error);
+    }
+
+    if (!update.resolved) {
+        return unchanged("error", "An update was found but its release couldn't be resolved");
+    }
+
+    // the source is the one it was installed from, so this means the registry changed under it
+    if (update.resolved.conflict) {
+        return unchanged("error", `${name}'s latest release would replace a package from somewhere else`);
+    }
+
+    try {
+        await install_resolved_package(update.resolved);
+
+        return {
+            name,
+            previous_version: installed_version,
+            installed_version: update.resolved.version,
+            status: "updated"
+        };
+    } catch (error) {
+        if (error instanceof PackageInUseError) {
+            return unchanged("in_use", error.message);
+        }
+
+        return unchanged("error", error instanceof Error ? error.message : String(error));
+    }
+}
+
+/**
+ * Updates packages to their latest release, one after another under one install lock.
+ * @param names the packages to update, or every installed one
+ * @returns what happened to each, in the same order
+ * @throws InstallLockedError if another install is running
+ */
+export const update_packages = async (names?: string[]): Promise<UpdateResult[]> => {
+    return with_install_lock(async () => {
+        const installed = read_installed();
+
+        // update all installed packages if names not specified
+        if (names === undefined) {
+            names = Object.keys(installed.packages);
+        }
+
+        // resolve updates in parallel, then install one at a time, as each install rewrites the registry
+        const found_updates = await Promise.all(names.map((name) => find_update(name, installed)));
+
+        const results: UpdateResult[] = [];
+        for (const found of found_updates) {
+            const result = await update_one(found);
+            results.push(result);
+        }
+
+        return results;
+    });
 }

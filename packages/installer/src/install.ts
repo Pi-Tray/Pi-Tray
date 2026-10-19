@@ -38,6 +38,15 @@ const is_locked_error = (error: unknown): boolean => {
     return code === "EPERM" || code === "EBUSY" || code === "EACCES";
 }
 
+/**
+ * The package's folder couldn't be replaced because something has it open, e.g. the server has its native modules loaded.
+ */
+export class PackageInUseError extends Error {
+    constructor(folder: string) {
+        super(`${folder} is in use, stop the server and try again`);
+    }
+}
+
 // swaps the new folder in, putting the old one back if that fails, so a failed install never leaves the package missing
 const move_into_place = (extracted_dir: string, destination: string, attempt_dir: string) => {
     fs.mkdirSync(path.dirname(destination), {recursive: true});
@@ -52,7 +61,7 @@ const move_into_place = (extracted_dir: string, destination: string, attempt_dir
         } catch (error) {
             if (is_locked_error(error)) {
                 // windows won't move a folder while the server has one of its native modules loaded
-                throw new Error(`${destination} is in use, stop the server and try again`);
+                throw new PackageInUseError(destination);
             }
             throw error;
         }
@@ -67,6 +76,7 @@ const move_into_place = (extracted_dir: string, destination: string, attempt_dir
         throw error;
     }
 }
+
 
 const install_resolved = async (resolved: ResolvedPackage, attempt_dir: string) => {
     let archive_path: string;
