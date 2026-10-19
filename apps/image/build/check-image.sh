@@ -69,6 +69,8 @@ grep -qs "enable pi-tray-kiosk.service" "$root_dir/etc/systemd/system-preset/10-
 [ "$(readlink "$root_dir/etc/systemd/system/userconfig.service")" = "/dev/null" ] || fail "first boot wizard isn't masked"
 [ -f "$root_dir/boot/firmware/admin.example.txt" ] || fail "admin.example.txt is missing from the boot partition"
 [ ! -e "$root_dir/boot/firmware/admin.txt" ] || fail "an admin.txt is baked into the image"
+[ "$(chroot "$root_dir" stat -c '%U:%G %a' /var/log/pi-tray 2>/dev/null)" = "pi-tray:adm 2750" ] || fail "/var/log/pi-tray is missing or doesn't have pi-tray:adm 2750"
+grep -qs "/var/log/pi-tray/console.log" "$root_dir/home/pi-tray/.xinitrc" || fail ".xinitrc doesn't log the console to /var/log/pi-tray"
 
 for binary in chromium startx unclutter xset; do
     chroot "$root_dir" /bin/sh -c "command -v $binary" > /dev/null || fail "$binary is not installed"

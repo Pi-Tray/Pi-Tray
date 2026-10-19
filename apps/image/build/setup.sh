@@ -21,6 +21,10 @@ apt-get install -y --no-install-recommends xserver-xorg xinit x11-xserver-utils 
 # no password, so it can only be used by the kiosk service on the screen
 useradd --system --create-home --home-dir /home/pi-tray --shell /bin/bash --groups video,input,render,audio pi-tray
 
+# the kiosk's console log, written by pi-tray and readable by admins (the adm group) without sudo
+# setgid, so files made inside it belong to adm too
+install -d -o pi-tray -g adm -m 2750 /var/log/pi-tray
+
 # shown on screen just before the kiosk starts, and left there if it can't start
 cat > /usr/local/bin/pi-tray-boot-message <<'CONF'
 #!/bin/sh
@@ -632,6 +636,8 @@ CONF
 
 cat > /home/pi-tray/.xinitrc <<'CONF'
 #!/bin/sh
+# files it creates are readable by its group, so the console log can be read by admins
+umask 027
 xset s off
 xset s noblank
 xset -dpms
@@ -643,7 +649,13 @@ unclutter -idle 0.5 -root &
 # and tr strips the carriage returns windows editors add. only the first address is used
 server_url=$(sed '1s/^\xEF\xBB\xBF//' /boot/firmware/pi-tray.txt 2>/dev/null | grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*\r\?$' | head -n 1 | tr -d '\r[:space:]')
 
-exec chromium \
+# the page's console, filtered from chromium's own logging, kept across restarts. moved aside once it gets big
+console_log=/var/log/pi-tray/console.log
+if [ "$(stat -c %s "$console_log" 2>/dev/null || echo 0)" -gt 5000000 ]; then
+    mv "$console_log" "$console_log.1"
+fi
+
+chromium \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \
@@ -651,7 +663,9 @@ exec chromium \
     --check-for-update-interval=31536000 \
     --force-dark-mode \
     --allow-file-access-from-files \
-    "file:///opt/pi-tray/client/index.html?ws=${server_url}"
+    --enable-logging=stderr \
+    "file:///opt/pi-tray/client/index.html?ws=${server_url}" \
+    2>&1 | grep --line-buffered ':CONSOLE' >> "$console_log"
 CONF
 
 chown pi-tray:pi-tray /home/pi-tray/.xinitrc
