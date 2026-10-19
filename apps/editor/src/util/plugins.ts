@@ -57,8 +57,35 @@ export interface RemoveResult {
     purged: boolean;
 }
 
+export interface UpdateCheckResult {
+    name: string;
+    installed_version: string | null;
+    latest_version: string | null;
+
+    /** pinned: installed from a specific tag, so left alone. local: installed from a file, so there's nowhere to check */
+    status: "update_available" | "up_to_date" | "pinned" | "local" | "error";
+    error?: string;
+}
+
+export interface UpdateResult {
+    name: string;
+
+    /** What was installed before, or null if it isn't installed */
+    previous_version: string | null;
+
+    /** What's installed now: the new version if it updated, otherwise the same as previous_version */
+    installed_version: string | null;
+
+    /** updated, or why it wasn't: the check's own status, or in_use when the server has its native modules loaded */
+    status: "updated" | "in_use" | UpdateCheckResult["status"];
+    error?: string;
+}
+
 // what "package install" exits with when it found a package of the same name from another source
 const EXIT_CONFLICT = 2;
+
+// what "package update" exits with when it left a package alone because the server has its native modules loaded
+const EXIT_IN_USE = 3;
 
 /**
  * Runs a pi-tray package command and parses its JSON result.
@@ -68,7 +95,8 @@ const EXIT_CONFLICT = 2;
 const run_package_command = async <Result>(command_args: string[]): Promise<Result> => {
     const output = await Command.sidecar("binaries/pi-tray", ["package", ...command_args]).execute();
 
-    if (output.code !== 0 && output.code !== EXIT_CONFLICT) {
+    // conflict and in use still print their result
+    if (output.code !== 0 && output.code !== EXIT_CONFLICT && output.code !== EXIT_IN_USE) {
         let message = output.stderr.trim() || `pi-tray package ${command_args[0]} exited with ${output.code}`;
 
         // errors are {"error": "..."}, apart from info's, which are plain text
@@ -120,6 +148,25 @@ export const install_package = (spec: string, replace = false): Promise<InstallR
  */
 export const remove_package = (package_name: string, purge = false): Promise<RemoveResult> => {
     return run_package_command(["remove", package_name, ...(purge ? ["--purge"] : [])]);
+}
+
+/**
+ * Checks installed packages for a newer release, without changing anything.
+ * @param names the packages to check, or every installed one
+ * @returns each package's status. one that couldn't be checked is an error result rather than a throw
+ */
+export const check_package_updates = (names: string[] = []): Promise<UpdateCheckResult[]> => {
+    return run_package_command(["outdated", ...names]);
+}
+
+/**
+ * Updates installed packages to their latest release, one after another.
+ * @param names the packages to update, or every installed one
+ * @returns what happened to each. one the server has in use comes back as in_use, so stop the server and try it again
+ * @throws if another install is running
+ */
+export const update_packages = (names: string[] = []): Promise<UpdateResult[]> => {
+    return run_package_command(["update", ...names]);
 }
 
 const change_listeners = new Set<() => void>();
