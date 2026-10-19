@@ -2,6 +2,7 @@ import {useCallback, useEffect, useRef, useState} from "react";
 import {ConfigKey, useConfigValue} from "../util/config";
 import {Link} from "wouter";
 import {Server} from "lucide-react";
+import {editor_version} from "../version.ts";
 
 interface BaseSettingProps {
     label: string;
@@ -167,45 +168,49 @@ export const SettingsPage = () => {
     );
 
     return (
-        <>
+        <div className="flex flex-col gap-4 h-full w-full items-start justify-start">
             <h1 className="text-2xl font-bold">Settings</h1>
 
-            <div className="flex flex-wrap gap-8 mt-4">
-                <ToggleSetting
-                    label="Show DevTools"
-                    config_key="devtools"
-
-                    tooltip="Enable or disable the DevTools page."
-                />
-
-                <div className="flex flex-col gap-4 items-end">
-                    <TextSetting
-                        label="WebSocket URL"
-                        config_key="ws_url"
-
-                        tooltip="The address which Pi-Tray Server is listening on for WebSocket connections."
-
-                        type="url"
-                        validate={validate_ws_url}
-                        //pattern="^wss?://.+"
-
-                        disabled={ws_url_locked}
-                    />
-
+            <div className="flex flex-col gap-4 mt-4 items-start justify-start h-full">
+                <div className="flex flex-wrap gap-8 mt-4">
                     <ToggleSetting
-                        label="Set automatically"
-                        config_key="dont_overwrite_ws_url"
-                        invert={true}
+                        label="Show DevTools"
+                        config_key="devtools"
 
-                        tooltip="If enabled, the WebSocket URL will be automatically set by the server process when it starts.&#013;Disable to prevent this behaviour and set a custom URL.&#013;The server will need to be restarted to have it update the value."
+                        tooltip="Enable or disable the DevTools page."
                     />
+
+                    <div className="flex flex-col gap-4 items-end">
+                        <TextSetting
+                            label="WebSocket URL"
+                            config_key="ws_url"
+
+                            tooltip="The address which Pi-Tray Server is listening on for WebSocket connections."
+
+                            type="url"
+                            validate={validate_ws_url}
+                            //pattern="^wss?://.+"
+
+                            disabled={ws_url_locked}
+                        />
+
+                        <ToggleSetting
+                            label="Set automatically"
+                            config_key="dont_overwrite_ws_url"
+                            invert={true}
+
+                            tooltip="If enabled, the WebSocket URL will be automatically set by the server process when it starts.&#013;Disable to prevent this behaviour and set a custom URL.&#013;The server will need to be restarted to have it update the value."
+                        />
+                    </div>
                 </div>
+
+                <Link href="/server" className="btn btn-primary mt-4">
+                    <Server className="mr-2" />
+                    Configure server
+                </Link>
             </div>
 
-            <Link href="/server" className="btn btn-primary mt-4">
-                <Server className="mr-2" />
-                Configure server
-            </Link>
-        </>
+            <p className="text-gray-500 tracking-wide font-light text-xs">Pi-Tray v{editor_version}</p>
+        </div>
     );
 }
