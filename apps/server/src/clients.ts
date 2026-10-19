@@ -49,6 +49,10 @@ export class Client {
     get session_id(): string {
         return this.session.id;
     }
+
+    get asset_key(): CryptoKey {
+        return this.session.asset_key;
+    }
 }
 
 export const connected_clients = new Set<Client>();

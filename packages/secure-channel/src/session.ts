@@ -155,7 +155,7 @@ export const start_server_session = async <T>(transport: Transport): Promise<Ses
 
         const secret = await derive_shared_secret(parse_hello(client_hello_text), keypair);
         const hash = await transcript_hash(client_hello_text, server_hello_text);
-        const keys = await derive_session_keys(secret, hash, "client");
+        const keys = await derive_session_keys(secret, hash, "server");
 
         const session = new Session<T>(keys, transport, hash);
         await session.send_finished(hash);

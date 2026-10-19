@@ -1,5 +1,5 @@
 import {useChannel, useChannelMessage} from "../../contexts/WSContext.tsx";
-import {useState, useCallback} from "react";
+import {useState, useCallback, useEffect, useRef} from "react";
 
 import {AutoTextScale} from "@pi-tray/ui/AutoTextScale";
 
@@ -7,29 +7,7 @@ import {DynamicIcon} from "lucide-react/dynamic";
 
 import styles from "./component.module.css";
 import {ServerMessage} from "@pi-tray/types";
-
-/**
- * Resolves an asset path from the server (e.g. `/assets/<id>.png?v=123`) against the server's address.<br>
- * Anything that would load from a different origin is rejected.
- * @param asset_path the path from the server, or null for no image
- * @param socket_url the websocket's url, e.g. ws://192.168.50.1:31415
- * @returns the full http url, or an empty string for no image
- */
-const resolve_asset_url = (asset_path: string | null | undefined, socket_url: string): string => {
-    if (!asset_path) {
-        return "";
-    }
-
-    // ws -> http and wss -> https
-    const server_base = socket_url.replace(/^ws/, "http");
-
-    try {
-        const resolved_url = new URL(asset_path, server_base);
-        return resolved_url.origin === new URL(server_base).origin ? resolved_url.href : "";
-    } catch {
-        return "";
-    }
-}
+import {load_asset, StaleAssetSessionError} from "../../util/assets.ts";
 
 interface PushButtonProps {
     x: number;
@@ -49,7 +27,13 @@ interface PushButtonProps {
 export const PushButton = ({x, y, style, className}: PushButtonProps) => {
     const [text, setText] = useState("");
     const [text_is_icon, setTextIsIcon] = useState(false);
+
+    // the background as the server sent it, e.g. /assets/<id>.png?v=123, and the object url it's shown with once loaded
+    const [background_path, setBackgroundPath] = useState<string | null>(null);
     const [background_url, setBackgroundURL] = useState("");
+
+    // what background_url is currently showing, so a reconnect doesn't load the same image again
+    const shown_background_path = useRef<string | null>(null);
 
     const [pushable, setPushable] = useState(true);
 
@@ -122,15 +106,67 @@ export const PushButton = ({x, y, style, className}: PushButtonProps) => {
                         button_log("Server set cell:", cell.text, "is icon:", cell.is_icon, "background:", cell.background);
                         setText(cell.text);
                         setTextIsIcon(cell.is_icon || false);
-                        setBackgroundURL(resolve_asset_url(cell.background, channel?.url ?? ""));
                         setPushable(cell.pushable ?? true);
+                        setBackgroundPath(cell.background);
                     }
                     break;
                 }
             }
         },
-        [x, y, button_log, button_error, channel?.url]
+        [x, y, button_log, button_error]
     );
+
+    const socket_url = channel?.url ?? "";
+    const assets = channel?.assets ?? null;
+
+    // load the background when it changes, or once a new session can load it, e.g. after the last one was stale
+    useEffect(() => {
+        if (!background_path) {
+            shown_background_path.current = null;
+            setBackgroundURL("");
+            return;
+        }
+
+        // already showing it, or not logged in yet. the current image stays up while reconnecting
+        if (background_path === shown_background_path.current || !assets) {
+            return;
+        }
+
+        // the background or session changed again before this finished
+        let superseded = false;
+
+        load_asset(background_path, socket_url, assets)
+            .then((image) => {
+                if (superseded) {
+                    return;
+                }
+
+                // null is a missing or replaced asset, and a replaced one's new path follows in a set_cells
+                shown_background_path.current = image ? background_path : null;
+                setBackgroundURL(image ? URL.createObjectURL(image) : "");
+            })
+            .catch((error) => {
+                // the session ended while loading, the next one loads it again
+                if (!(error instanceof StaleAssetSessionError)) {
+                    button_error("Couldn't load background:", error);
+                }
+            });
+
+        return () => {
+            superseded = true;
+        };
+        // the session's id rather than the object, which is new on every render of the channel
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [background_path, socket_url, assets?.id, button_error]);
+
+    // revoked once it's been replaced on screen (or the button unmounts), so the old image is never shown broken
+    useEffect(() => {
+        return () => {
+            if (background_url) {
+                URL.revokeObjectURL(background_url);
+            }
+        };
+    }, [background_url]);
 
     // react to server messages for as long as the button is mounted
     useChannelMessage(handle_message);

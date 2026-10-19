@@ -39,6 +39,8 @@ export interface Channel {
     subscribe: (handler: (message: ServerMessage) => void) => () => void;
 
     pairing_code: string | null;
+
+    assets: {id: string, key: CryptoKey} | null;
 }
 
 const ChannelContext = createContext<Channel | null>(null);
@@ -236,7 +238,8 @@ export const WSProvider = ({url, children, max_backoff_ms = DEFAULT_MAX_BACKOFF_
         url,
         send,
         subscribe,
-        pairing_code
+        pairing_code,
+        assets: status === "ready" && session.current ? {id: session.current.id, key: session.current.asset_key} : null
     }), [status, url, send, subscribe, pairing_code]);
 
     return <ChannelContext.Provider value={channel}>{children}</ChannelContext.Provider>;

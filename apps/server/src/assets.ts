@@ -4,7 +4,8 @@ import fs from "fs";
 import path from "path";
 
 import {in_data_dir} from "@pi-tray/paths";
-import {ASSET_CONTENT_TYPES, ASSET_FILE_PATTERN, ASSET_ID_PATTERN, ASSET_PATH_PATTERN, AssetExtension} from "./types";
+import {ASSET_FILE_PATTERN, ASSET_ID_PATTERN, ASSET_PATH_PATTERN, AssetExtension} from "./types";
+import {find_client} from "./clients";
 
 export const assets_dir = in_data_dir("assets");
 fs.mkdirSync(assets_dir, {recursive: true});
@@ -74,58 +75,124 @@ fs.watch(assets_dir, (_event_type, file_name) => {
     }, 250));
 });
 
+// the client fetches assets from a file:// page, so every response, errors included, has to be readable cross-origin
+const CORS_HEADERS = {"Access-Control-Allow-Origin": "*"};
+
+const NONCE_BYTES = 12;
+
 const send_status = (response: ServerResponse, status_code: number, headers: Record<string, string> = {}) => {
-    response.writeHead(status_code, headers);
+    response.writeHead(status_code, {...CORS_HEADERS, ...headers});
     response.end();
 }
 
-/**
- * HTTP handler that serves files from the assets folder, and nothing else.<br>
- * Only `/assets/<uuid>.<image extension>` is accepted, any query string (e.g. `?v=` for cache busting) is ignored.
- * @param request the incoming request
- * @param response the response to write to
- */
-export const handle_asset_request = (request: IncomingMessage, response: ServerResponse) => {
-    if (request.method !== "GET" && request.method !== "HEAD") {
-        send_status(response, 405, {Allow: "GET, HEAD"});
+const text_encoder = new TextEncoder();
+
+const serve_asset = async (request: IncomingMessage, response: ServerResponse) => {
+    if (request.method !== "GET") {
+        send_status(response, 405, {Allow: "GET"});
         return;
     }
 
     // parse rather than slicing the raw url, the base is only needed because request.url is relative
-    const url_path = new URL(request.url ?? "/", "http://localhost").pathname;
-    const path_match = url_path.match(ASSET_PATH_PATTERN);
+    const url = new URL(request.url ?? "/", "http://localhost");
+    const version = url.searchParams.get("v");
+    const session_id = url.searchParams.get("s");
 
+    if (!version || !session_id) {
+        send_status(response, 400);
+        return;
+    }
+
+    // checked before the file, so nothing about which assets exist is given away to anyone not logged in
+    const client = find_client(session_id);
+    if (!client) {
+        send_status(response, 403);
+        return;
+    }
+
+    const path_match = url.pathname.match(ASSET_PATH_PATTERN);
     if (!path_match) {
         send_status(response, 404);
         return;
     }
 
     const [, asset_id, extension] = path_match;
-    const file_path = path.join(assets_dir, `${asset_id}.${extension}`);
+    const file_name = `${asset_id}.${extension}`;
+    const file_path = path.join(assets_dir, file_name);
 
-    fs.stat(file_path, (stat_error, stats) => {
-        if (stat_error || !stats.isFile()) {
-            send_status(response, 404);
-            return;
+    // the file's current version, the same way resolve_asset_url works it out, or null if it isn't there
+    const current_version = async (): Promise<string | null> => {
+        try {
+            const stats = await fs.promises.stat(file_path);
+            return stats.isFile() ? String(Math.floor(stats.mtimeMs)) : null;
+        } catch {
+            return null;
         }
+    };
 
-        response.writeHead(200, {
-            "Content-Type": ASSET_CONTENT_TYPES[extension as AssetExtension],
-            "Content-Length": stats.size,
-            // urls carry ?v=<mtime>, so a replaced file gets a new url and this can be cached forever
-            "Cache-Control": "public, max-age=31536000, immutable",
-            "X-Content-Type-Options": "nosniff",
-            // svgs can contain scripts, this stops them running if an asset url is ever opened directly rather than via <img>
-            "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox",
-        });
+    // an old url gets a 404 rather than the new image, which would otherwise be cached under the old version
+    if (await current_version() !== version) {
+        send_status(response, 404);
+        return;
+    }
 
-        if (request.method === "HEAD") {
-            response.end();
-            return;
+    let contents: Buffer;
+    try {
+        contents = await fs.promises.readFile(file_path);
+    } catch {
+        send_status(response, 404);
+        return;
+    }
+
+    // replaced while it was being read, so what was read may not be this version
+    if (await current_version() !== version) {
+        send_status(response, 404);
+        return;
+    }
+
+    // tied to this asset and version, so one response can't be passed off as another
+    const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
+    const ciphertext = await crypto.subtle.encrypt(
+        {name: "AES-GCM", iv: nonce, additionalData: text_encoder.encode(`${file_name}:${version}`)},
+        client.asset_key,
+        // a copy, as webcrypto wants memory that can't be shared, which node's pooled buffers might be
+        new Uint8Array(contents)
+    );
+
+    const body = Buffer.concat([nonce, new Uint8Array(ciphertext)]);
+
+    response.writeHead(200, {
+        ...CORS_HEADERS,
+        // the real type comes from the extension once the client has decrypted it
+        "Content-Type": "application/octet-stream",
+        "Content-Length": body.length,
+        // only this session can decrypt it, and the client caches the decrypted image itself
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+    });
+    response.end(body);
+}
+
+/**
+ * HTTP handler that serves files from the assets folder, and nothing else, encrypted for the session asking.<br>
+ * Only `/assets/<uuid>.<image extension>?v=<version>&s=<session id>` is accepted:
+ * - `v`: the version from {@link resolve_asset_url}, which has to be the file's current one
+ * - `s`: the id of the logged in session asking, whose asset key the response is encrypted with
+ *
+ * The body is a 12 byte nonce then the AES-256-GCM ciphertext, with `<uuid>.<extension>:<version>` as the associated data.<br>
+ * 400 for a missing parameter, 403 for a session that isn't logged in (e.g. it reconnected), 404 for a missing or old asset.
+ * @param request the incoming request
+ * @param response the response to write to
+ */
+export const handle_asset_request = (request: IncomingMessage, response: ServerResponse) => {
+    serve_asset(request, response).catch((error) => {
+        console.error("Failed to serve an asset:", error);
+
+        if (response.headersSent) {
+            response.destroy();
+        } else {
+            send_status(response, 500);
         }
-
-        fs.createReadStream(file_path)
-            .on("error", () => response.destroy())
-            .pipe(response);
     });
 }
