@@ -21,6 +21,7 @@ export class Session<AppData = unknown> {
     readonly #receive_key: CryptoKey;
     readonly #transport: Transport;
 
+    readonly id: string;
     readonly handshake_hash: ArrayBuffer;
     readonly asset_key: CryptoKey;
 
@@ -39,6 +40,9 @@ export class Session<AppData = unknown> {
         this.asset_key = keys.asset_key;
         this.#transport = transport;
         this.handshake_hash = handshake_hash;
+
+        // derive id from handshake hash (url-safe base64, no padding)
+        this.id = bytes_to_base64(new Uint8Array(handshake_hash, 0, 16)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
     }
 
     send<MessageData = unknown>(message: SecureMessage<MessageData>): Promise<void> {
