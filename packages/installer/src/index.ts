@@ -4,11 +4,14 @@ export * from "./read";
 export {host_target, resolve_archive, resolve_package} from "./resolve";
 export type {ArchiveLocation, ArchiveOrigin, ManifestTarget, RemoteManifest, ResolvedPackage} from "./resolve";
 export {install_package, parse_install_spec} from "./install";
-export type {InstallOptions, InstallResult} from "./install";
+export type {InstallOptions, InstallResult, PackageInUseError} from "./install";
 export {remove_package} from "./remove";
 export type {RemoveOptions, RemoveResult} from "./remove";
 export {ensure_bundled_packages} from "./bundled";
 export type {BundledOutcome, BundledPackage} from "./bundled";
+export {check_update, check_updates, update_packages} from "./update";
+export type {UpdateCheckResult, UpdateResult} from "./update";
+export type {InstallLockedError} from "./lock";
 
 /**
  * Every installed package, sorted by name.

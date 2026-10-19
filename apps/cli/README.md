@@ -6,14 +6,14 @@ The [server](../server), the [supervisor](../supervisor) and the [package manage
 pi-tray <command> [args...]
 ```
 
-| Command | What it does |
-| --- | --- |
-| `supervise [--foreground]` | Runs the supervisor, which runs the server and restarts it on request. On Windows it starts itself again in the background unless `--foreground` |
-| `server [args...]` | Runs the server on its own, e.g. `--host` and `--port` to override its settings file |
-| `package info\|resolve\|install\|remove\|list` | Installs, removes and inspects plugin packages. Results are printed as JSON |
-| `status`, `start`, `stop`, `restart`, `watch`, `quit` | Controls the running supervisor and its server |
-| `autostart enable\|disable\|status` | Whether the supervisor starts when you log in |
-| `help [command]` | Shows the commands, or one command's usage |
+| Command                                                          | What it does                                                                                                                                     |
+|------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+| `supervise [--foreground]`                                       | Runs the supervisor, which runs the server and restarts it on request. On Windows it starts itself again in the background unless `--foreground` |
+| `server [args...]`                                               | Runs the server on its own, e.g. `--host` and `--port` to override its settings file                                                             |
+| `package info\|resolve\|install\|remove\|list\|outdated\|update` | Installs, removes and inspects plugin packages. Results are printed as JSON                                                                      |
+| `status`, `start`, `stop`, `restart`, `watch`, `quit`            | Controls the running supervisor and its server                                                                                                   |
+| `autostart enable\|disable\|status`                              | Whether the supervisor starts when you log in                                                                                                    |
+| `help [command]`                                                 | Shows the commands, or one command's usage                                                                                                       |
 
 It's a console program, so its output shows in a terminal on every platform. Started at login on Windows, a console window flashes briefly while it moves itself into the background.
 

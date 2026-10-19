@@ -1,20 +1,33 @@
-// the editor's plugin helper and installer, run as "pi-tray-service package <command>"
+// the editor's plugin helper and installer, run as "pi-tray package <command>"
 //   info <package>                     each plugin in an installed package
 //   resolve <spec>                     what installing a spec would install, without changing anything
 //   install <spec> [--replace]         installs a spec, e.g. Pi-Tray/ghost-plugins, a manifest link or a path to a .tgz
 //   remove <package> [--purge]         removes a package, and with --purge its data folder too
 //   list                               every installed package
+//   outdated [names...]                checks every installed package for a newer release, or just the named ones
+//   update [names...]                  updates every installed package to its latest release, or just the named ones
 //
 // the editor reads the result from stdout as JSON, so nothing else goes there. errors go to stderr as {"error": "..."}
-// exit codes: 0 done, 1 failed, 2 install found a package of the same name from another source (run again with --replace)
+// exit codes: 0 done, 1 failed, 2 install found a package of the same name from another source (run again with --replace),
+// 3 update left a package alone because the server has its native modules loaded (stop the server and run again).
+// with 2 and 3 the result is still on stdout. a package that couldn't be checked or updated is an error row in the result
 
 import {parseArgs} from "util";
 
-import {install_package, list_packages, parse_install_spec, remove_package, resolve_package} from "@pi-tray/installer";
+import {
+    check_updates,
+    install_package,
+    list_packages,
+    parse_install_spec,
+    remove_package,
+    resolve_package,
+    update_packages
+} from "@pi-tray/installer";
 
 import {run_package_info_command} from "./info";
 
 export const EXIT_CONFLICT = 2;
+export const EXIT_IN_USE = 3;
 
 const print_json = (value: unknown) => console.log(JSON.stringify(value));
 
@@ -54,6 +67,9 @@ export const run_package_cli = async (argv: string[]): Promise<number> => {
             return positionals[0];
         }
 
+        // no names means every installed package, rather than none
+        const names = positionals.length > 0 ? positionals : undefined;
+
         switch (command) {
             case "resolve":
                 print_json(await resolve_package(parse_install_spec(argument("resolve <spec>"))));
@@ -73,8 +89,18 @@ export const run_package_cli = async (argv: string[]): Promise<number> => {
                 print_json(list_packages());
                 return 0;
 
+            case "outdated":
+                print_json(await check_updates(names));
+                return 0;
+
+            case "update": {
+                const results = await update_packages(names);
+                print_json(results);
+                return results.some((result) => result.status === "in_use") ? EXIT_IN_USE : 0;
+            }
+
             default:
-                throw new Error(`Unknown package command "${command}", expected: info, resolve, install, remove, list`);
+                throw new Error(`Unknown package command "${command}", expected: info, resolve, install, remove, list, outdated, update`);
         }
     } catch (error) {
         console.error(JSON.stringify({error: error instanceof Error ? error.message : String(error)}));
