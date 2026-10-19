@@ -45,9 +45,24 @@ export class Client {
             }
         };
     }
+
+    get session_id(): string {
+        return this.session.id;
+    }
 }
 
 export const connected_clients = new Set<Client>();
+
+export const find_client = (session_id: string): Client | undefined => {
+    // only a handful of clients are connected at once, so a linear search is fine (trivial to add a map if this ever changes)
+    for (const client of connected_clients) {
+        if (client.session_id === session_id) {
+            return client;
+        }
+    }
+
+    return undefined;
+}
 
 export const send_to_editors = (message: WireMessage) => {
     for (const client of connected_clients) {
