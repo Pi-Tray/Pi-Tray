@@ -22,6 +22,7 @@ export class Session<AppData = unknown> {
     readonly #transport: Transport;
 
     readonly handshake_hash: ArrayBuffer;
+    readonly asset_key: CryptoKey;
 
     #send_counter = 0;
     #receive_counter = 0;
@@ -32,9 +33,10 @@ export class Session<AppData = unknown> {
     // the transport only holds one waiting receiver, so overlapping receives would lose messages
     #receiving = false;
 
-    constructor(send_key: CryptoKey, receive_key: CryptoKey, transport: Transport, handshake_hash: ArrayBuffer) {
-        this.#send_key = send_key;
-        this.#receive_key = receive_key;
+    constructor(keys: {send_key: CryptoKey, receive_key: CryptoKey, asset_key: CryptoKey}, transport: Transport, handshake_hash: ArrayBuffer) {
+        this.#send_key = keys.send_key;
+        this.#receive_key = keys.receive_key;
+        this.asset_key = keys.asset_key;
         this.#transport = transport;
         this.handshake_hash = handshake_hash;
     }
@@ -126,9 +128,9 @@ export const start_client_session = async <T>(transport: Transport): Promise<Ses
 
         const secret = await derive_shared_secret(parse_hello(server_hello_text), keypair);
         const hash = await transcript_hash(client_hello_text, server_hello_text);
-        const {send_key, receive_key} = await derive_session_keys(secret, hash, "client");
+        const keys = await derive_session_keys(secret, hash, "client");
 
-        const session = new Session<T>(send_key, receive_key, transport, hash);
+        const session = new Session<T>(keys, transport, hash);
         await session.expect_finished(hash);
         await session.send_finished(hash);
         return session;
@@ -149,9 +151,9 @@ export const start_server_session = async <T>(transport: Transport): Promise<Ses
 
         const secret = await derive_shared_secret(parse_hello(client_hello_text), keypair);
         const hash = await transcript_hash(client_hello_text, server_hello_text);
-        const {send_key, receive_key} = await derive_session_keys(secret, hash, "server");
+        const keys = await derive_session_keys(secret, hash, "client");
 
-        const session = new Session<T>(send_key, receive_key, transport, hash);
+        const session = new Session<T>(keys, transport, hash);
         await session.send_finished(hash);
         await session.expect_finished(hash);
         return session;

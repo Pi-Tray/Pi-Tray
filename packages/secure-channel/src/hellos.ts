@@ -31,7 +31,8 @@ export const derive_shared_secret = async (peer_hello: HelloMessage, keypair: Cr
 export const derive_session_keys = async (shared_secret: ArrayBuffer, transcript_hash: ArrayBuffer, role: "client" | "server") => {
     const key_material = await crypto.subtle.importKey("raw", shared_secret, "HKDF", false, ["deriveKey"]);
 
-    const derive_direction_key = (label: string) => crypto.subtle.deriveKey(
+    // non-extractable, so a key can be used but never read back out
+    const derive_key = (label: string) => crypto.subtle.deriveKey(
         {name: "HKDF", hash: "SHA-256", salt: transcript_hash, info: new TextEncoder().encode(label)},
         key_material,
         {name: "AES-GCM", length: 256},
@@ -39,10 +40,13 @@ export const derive_session_keys = async (shared_secret: ArrayBuffer, transcript
         ["encrypt", "decrypt"]
     );
 
-    const client_to_server = await derive_direction_key("pi-tray v1 client to server");
-    const server_to_client = await derive_direction_key("pi-tray v1 server to client");
+    const client_to_server = await derive_key("pi-tray v1 client to server");
+    const server_to_client = await derive_key("pi-tray v1 server to client");
+
+    // its own key rather than reusing a channel key, as assets use random nonces and the channel uses counters
+    const asset_key = await derive_key("pi-tray v1 assets");
 
     return role === "client"
-        ? {send_key: client_to_server, receive_key: server_to_client}
-        : {send_key: server_to_client, receive_key: client_to_server};
+        ? {send_key: client_to_server, receive_key: server_to_client, asset_key}
+        : {send_key: server_to_client, receive_key: client_to_server, asset_key};
 }
