@@ -6,6 +6,7 @@ import {SupervisorControl, useSupervisor} from "../contexts/SupervisorProvider";
 import {useAutostart} from "../util/autostart";
 import {ServerConfigForm} from "../components/ServerConfigForm.tsx";
 import {show_confirm} from "../util/dialogs.ts";
+import {editor_version} from "../version.ts";
 
 interface ServerSummary {
     text: string;
@@ -159,7 +160,7 @@ export const ServerPage = () => {
                 <div role="alert" className="alert alert-warning">
                     <TriangleAlert className="w-5 h-5" />
                     <span>
-                        The background service is running Pi-Tray {supervisor.supervisor_version ?? "from an older version"}, but this editor is {supervisor.editor_version}.
+                        The background service is running Pi-Tray {supervisor.version ?? "from an older version"}, but this editor is {editor_version}.
                         Stop and start it to run this version.
                     </span>
                 </div>

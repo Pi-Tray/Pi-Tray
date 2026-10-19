@@ -1,6 +1,6 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
 import {Child, Command} from "@tauri-apps/plugin-shell";
-import {getVersion} from "@tauri-apps/api/app";
+import {editor_version} from "../version.ts";
 
 // the supervisor's replies, as "pi-tray <command> --json" prints them. written out here rather than imported from
 // @pi-tray/supervisor, which is node code the webview can't load
@@ -53,10 +53,7 @@ export interface SupervisorControl {
     status: SupervisorStatus | null;
 
     /** The running supervisor's version, or null if it isn't connected or is too old to say */
-    supervisor_version: string | null;
-
-    /** This editor's version, the one its bundled CLI was built as, or null until it's been read */
-    editor_version: string | null;
+    version: string | null;
 
     /**
      * The running supervisor isn't this editor's version, e.g. Pi-Tray was updated without restarting it,
@@ -141,11 +138,6 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
     const [status, setStatus] = useState<SupervisorStatus | null>(null);
     const [pending_action, setPendingAction] = useState<ServerAction | "launch" | null>(null);
     const [supervisor_version, setSupervisorVersion] = useState<string | null>(null);
-    const [editor_version, setEditorVersion] = useState<string | null>(null);
-
-    useEffect(() => {
-        getVersion().then(setEditorVersion).catch((error) => console.error("Couldn't read the editor's version:", error));
-    }, []);
 
     const watch_child = useRef<Child | null>(null);
     const retry_timeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -348,8 +340,8 @@ export const SupervisorProvider = ({children}: SupervisorProviderProps) => {
     const version_mismatch = connection === "connected" && editor_version !== null && supervisor_version !== editor_version;
 
     const control = useMemo<SupervisorControl>(
-        () => ({connection, status, supervisor_version, editor_version, version_mismatch, pending_action, start, stop, run_action, launch}),
-        [connection, status, supervisor_version, editor_version, version_mismatch, pending_action, start, stop, run_action, launch]
+        () => ({connection, status, version: supervisor_version, version_mismatch, pending_action, start, stop, run_action, launch}),
+        [connection, status, supervisor_version, version_mismatch, pending_action, start, stop, run_action, launch]
     );
 
     return (
