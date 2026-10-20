@@ -53,7 +53,7 @@ const STATE_CLASSES: Record<NonNullable<PushButtonState>, string> = {
  */
 export const PushButtonFace = memo(({display, state = null, highlighted = false, badge, badge_title, on_click, className, style}: PushButtonFaceProps) => {
     const text = display?.text ?? "";
-    const pushable = display?.pushable !== false && display !== null;
+    const pushable = display?.pushable !== false;
 
     let content: ReactNode = null;
     if (text) {

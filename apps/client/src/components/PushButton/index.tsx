@@ -93,7 +93,11 @@ export const PushButton = memo(({x, y, cell, state, on_push, className}: PushBut
         [cell, background_url]
     );
 
-    const handle_click = useCallback(() => on_push(x, y), [on_push, x, y]);
+    const handle_click = useCallback(() => {
+        if (cell && cell.pushable !== false) {
+            on_push(x, y);
+        }
+    }, [cell, on_push, x, y]);
 
     return <PushButtonFace display={display} state={state} on_click={handle_click} className={className} />;
 });
