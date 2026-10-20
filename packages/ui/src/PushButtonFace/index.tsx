@@ -19,14 +19,15 @@ export interface PushButtonDisplay {
     pushable?: boolean;
 }
 
-export type PushButtonResult = "success" | "failure" | null;
+export type PushButtonResult = "success" | "failure";
+export type PushButtonState = PushButtonResult | "pending" | null;
 
 interface PushButtonFaceProps {
     /** null for an empty button */
     display: PushButtonDisplay | null;
 
-    /** Briefly outlines the button after a push */
-    result?: PushButtonResult;
+    /** Outline state of the button after a push, or "pending" for a push in progress */
+    state?: PushButtonState;
 
     highlighted?: boolean;
 
@@ -40,7 +41,8 @@ interface PushButtonFaceProps {
     style?: CSSProperties;
 }
 
-const RESULT_CLASSES: Record<NonNullable<PushButtonResult>, string> = {
+const STATE_CLASSES: Record<NonNullable<PushButtonState>, string> = {
+    pending: styles.pending,
     success: styles.success,
     failure: styles.failure
 };
@@ -49,7 +51,7 @@ const RESULT_CLASSES: Record<NonNullable<PushButtonResult>, string> = {
  * A grid button as it appears on screen, with no idea where its contents come from or what pushing it does.
  * @returns the element
  */
-export const PushButtonFace = memo(({display, result = null, highlighted = false, badge, badge_title, on_click, className, style}: PushButtonFaceProps) => {
+export const PushButtonFace = memo(({display, state = null, highlighted = false, badge, badge_title, on_click, className, style}: PushButtonFaceProps) => {
     const text = display?.text ?? "";
     const pushable = display?.pushable !== false && display !== null;
 
@@ -67,7 +69,7 @@ export const PushButtonFace = memo(({display, result = null, highlighted = false
 
     const classes = [
         styles.element,
-        result ? RESULT_CLASSES[result] : "",
+        state ? STATE_CLASSES[state] : "",
         highlighted ? styles.highlighted : "",
         className ?? ""
     ].filter(Boolean).join(" ");

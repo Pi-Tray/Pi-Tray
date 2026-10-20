@@ -1,6 +1,6 @@
 import {memo, useCallback, useEffect, useMemo, useRef, useState} from "react";
 
-import {ButtonDisplay, PushButtonFace, ButtonResult} from "@pi-tray/ui/PushButtonFace";
+import {PushButtonDisplay, PushButtonFace, PushButtonState} from "@pi-tray/ui/PushButtonFace";
 import {CellPayload} from "@pi-tray/types";
 
 import {useChannel} from "../../contexts/WSContext.tsx";
@@ -75,7 +75,7 @@ interface PushButtonProps {
     /** The cell as the server last sent it, or undefined if it hasn't yet */
     cell: CellPayload | undefined;
 
-    result: ButtonResult;
+    state: PushButtonState;
     on_push: (x: number, y: number) => void;
 
     className?: string;
@@ -85,15 +85,15 @@ interface PushButtonProps {
  * A button showing a cell from the server, which asks the server to push it when pressed.
  * @returns the element
  */
-export const PushButton = memo(({x, y, cell, result, on_push, className}: PushButtonProps) => {
+export const PushButton = memo(({x, y, cell, state, on_push, className}: PushButtonProps) => {
     const background_url = useAssetUrl(cell?.background ?? null);
 
-    const display = useMemo<ButtonDisplay | null>(
+    const display = useMemo<PushButtonDisplay | null>(
         () => cell ? {text: cell.text, text_is_icon: cell.is_icon, background_url: background_url || null, pushable: cell.pushable} : null,
         [cell, background_url]
     );
 
     const handle_click = useCallback(() => on_push(x, y), [on_push, x, y]);
 
-    return <PushButtonFace display={display} result={result} on_click={handle_click} className={className} />;
+    return <PushButtonFace display={display} state={state} on_click={handle_click} className={className} />;
 });

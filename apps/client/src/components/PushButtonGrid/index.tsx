@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 
 import {PushButtonGridLayout} from "@pi-tray/ui/PushButtonGridLayout";
-import {ButtonResult} from "@pi-tray/ui/PushButtonFace";
+import {PushButtonResult, PushButtonState} from "@pi-tray/ui/PushButtonFace";
 import {CellPayload, ServerMessage} from "@pi-tray/types";
 
 import {PushButton} from "../PushButton";
@@ -9,6 +9,9 @@ import {useChannel, useChannelMessage, useChannelReady} from "../../contexts/WSC
 
 // how long a push's outline shows for
 const RESULT_SHOWN_MS = 1000;
+
+// how long the button shows as pending before timing out
+const PUSH_PENDING_MS = 10000;
 
 const cell_key = (x: number, y: number) => `${x},${y}`;
 
@@ -32,29 +35,80 @@ export const PushButtonGrid = ({rows, cols, className, button_className, request
     const channel = useChannel();
 
     const [cells, setCells] = useState<ReadonlyMap<string, CellPayload>>(new Map());
-    const [results, setResults] = useState<ReadonlyMap<string, ButtonResult>>(new Map());
+    const [states, setStates] = useState<ReadonlyMap<string, PushButtonState>>(new Map());
     const result_timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
-    const show_result = useCallback((x: number, y: number, result: NonNullable<ButtonResult>) => {
+    // pushes still waiting for a reply, per cell, so the first reply to two quick presses doesn't end the second's pending
+    const pending_ref_counts = useRef(new Map<string, number>());
+
+    const clear_state = useCallback((key: string) => {
+        setStates((previous) => {
+            const next = new Map(previous);
+            next.delete(key);
+            return next;
+        });
+    }, []);
+
+    const show_result = useCallback((x: number, y: number, result: PushButtonResult) => {
         const key = cell_key(x, y);
 
-        setResults((previous) => new Map(previous).set(key, result));
+        // decrement ref counter for cell
+        const ref_count = pending_ref_counts.current.get(key) ?? 0;
+        if (ref_count > 1) {
+            pending_ref_counts.current.set(key, ref_count - 1);
+        } else {
+            pending_ref_counts.current.delete(key);
+        }
+
+        // if ref count is still > 0, don't show the result yet
+        if ((pending_ref_counts.current.get(key) ?? 0) > 0) {
+            return;
+        }
+
+        setStates((previous) => new Map(previous).set(key, result));
 
         clearTimeout(result_timers.current.get(key));
         result_timers.current.set(key, setTimeout(() => {
             result_timers.current.delete(key);
-            setResults((previous) => {
-                const next = new Map(previous);
-                next.delete(key);
-                return next;
-            });
+            clear_state(key);
         }, RESULT_SHOWN_MS));
-    }, []);
+    }, [clear_state]);
+
+    const show_pending = useCallback((x: number, y: number) => {
+        const key = cell_key(x, y);
+
+        setStates((previous) => new Map(previous).set(key, "pending"));
+
+        // increment ref counter for cell
+        const ref_count = pending_ref_counts.current.get(key) ?? 0;
+        pending_ref_counts.current.set(key, ref_count + 1);
+
+        clearTimeout(result_timers.current.get(key));
+        result_timers.current.set(key, setTimeout(() => {
+            result_timers.current.delete(key);
+
+            // the replies are given up on too, so a lost one can't leave the count stuck above zero
+            pending_ref_counts.current.delete(key);
+            clear_state(key);
+        }, PUSH_PENDING_MS));
+    }, [clear_state]);
 
     useEffect(() => {
         const timers = result_timers.current;
         return () => timers.forEach((timer) => clearTimeout(timer));
     }, []);
+
+    // pushes sent before a reconnect never get a reply
+    useEffect(() => {
+        if (channel?.status === "ready") {
+            return;
+        }
+
+        pending_ref_counts.current.clear();
+        result_timers.current.forEach((timer) => clearTimeout(timer));
+        result_timers.current.clear();
+        setStates(new Map());
+    }, [channel?.status]);
 
     const handle_message = useCallback(
         (message: ServerMessage) => {
@@ -86,11 +140,12 @@ export const PushButtonGrid = ({rows, cols, className, button_className, request
         (x: number, y: number) => {
             if (channel?.status === "ready") {
                 channel.send({action: "push", payload: {x, y}});
+                show_pending(x, y);
             } else {
                 console.error(`Can't push ${x},${y}, the channel isn't ready`);
             }
         },
-        [channel]
+        [channel, show_pending]
     );
 
     const request_all = useCallback(
@@ -117,7 +172,7 @@ export const PushButtonGrid = ({rows, cols, className, button_className, request
                     x={x}
                     y={y}
                     cell={cells.get(cell_key(x, y))}
-                    result={results.get(cell_key(x, y)) ?? null}
+                    state={states.get(cell_key(x, y)) ?? null}
                     on_push={push}
                     className={`${cell_className} ${button_className ?? ""}`}
                 />

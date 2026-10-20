@@ -46,6 +46,22 @@
     outline-color: #2568d2;
 }
 
+.element.pending {
+    animation: pending-outline 1s infinite;
+}
+
+@keyframes pending-outline {
+    0% {
+        outline-color: rgba(83, 110, 150, 0.5);
+    }
+    50% {
+        outline-color: transparent;
+    }
+    100% {
+        outline-color: rgba(83, 110, 150, 0.5);
+    }
+}
+
 .element.success {
     outline-color: #2568d2;
 }
