@@ -43,7 +43,7 @@
 }
 
 .element.highlighted {
-    outline-color: #2568d2;
+    outline-color: #605dff; /* TODO: pull in daisyUI colour properly, this is just pasted. fine for single theme. */
 }
 
 .element.pending {
