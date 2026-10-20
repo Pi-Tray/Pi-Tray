@@ -5,14 +5,20 @@
     "description": "React components shared by the editor and the client",
     "type": "module",
     "exports": {
-        "./AutoTextScale": "./src/AutoTextScale.tsx"
+        "./AutoTextScale": "./src/AutoTextScale.tsx",
+        "./PushButtonFace": "./src/PushButtonFace/index.tsx",
+        "./PushButtonGridLayout": "./src/PushButtonGridLayout/index.tsx",
+        "./CustomDynamicIcon": "./src/CustomDynamicIcon.tsx",
+        "./custom_icons": "./src/custom_icons.ts"
     },
     "peerDependencies": {
-        "react": "^18.0.0 || ^19.0.0"
+        "react": "^18.0.0 || ^19.0.0",
+        "lucide-react": "^1.0.0"
     },
     "devDependencies": {
         "@types/react": "catalog:react18",
         "react": "catalog:react18",
-        "typescript": "catalog:"
+        "typescript": "catalog:",
+        "lucide-react": "catalog:"
     }
 }

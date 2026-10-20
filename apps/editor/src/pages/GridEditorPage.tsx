@@ -8,7 +8,7 @@ import {Activity, ImageIcon, MousePointerClick, Plus, Settings, Trash, X} from "
 import {useChannel} from "../contexts/WSProvider.tsx";
 import {ConfigEditDialog} from "../components/ConfigEditDialog.tsx";
 import {IconPickerDialog} from "../components/IconPicker.tsx";
-import {CustomDynamicIcon} from "../components/CustomDynamicIcon.tsx";
+import {CustomDynamicIcon} from "@pi-tray/ui/CustomDynamicIcon";
 import {AssetPickerDialog} from "../components/AssetPickerDialog.tsx";
 import {PluginPickerDialog} from "../components/PluginPickerDialog.tsx";
 import {useLiveOverlayConnection} from "../util/live_overlay.ts";

@@ -3,7 +3,7 @@ import {useCallback, useEffect, useMemo, useState} from "react";
 import {PairedDeviceInfo} from "@pi-tray/types";
 import {Clock, KeyRound, MonitorSmartphone, Plus, RefreshCw, RotateCcw, Trash2} from "lucide-react";
 import {Link} from "wouter";
-import {CustomDynamicIcon} from "../components/CustomDynamicIcon.tsx";
+import {CustomDynamicIcon} from "@pi-tray/ui/CustomDynamicIcon";
 import {show_confirm} from "../util/dialogs.ts";
 
 const format_date = (date: string | number | Date) =>

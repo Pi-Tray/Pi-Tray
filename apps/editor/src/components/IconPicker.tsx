@@ -2,7 +2,7 @@ import {useEffect, useMemo, useRef, useState} from "react";
 
 import {DynamicIcon, iconNames} from "lucide-react/dynamic";
 import {Search, X} from "lucide-react";
-import {CUSTOM_ICONS} from "../custom_icons.ts";
+import {CUSTOM_ICONS} from "@pi-tray/ui/custom_icons";
 
 // how many matches to render at once, every lucide icon is its own lazily loaded chunk so rendering all ~1600 is slow
 const BATCH_SIZE = 120;

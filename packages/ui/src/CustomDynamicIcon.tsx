@@ -1,6 +1,6 @@
 import {DynamicIcon} from "lucide-react/dynamic";
-import {AutoTextScale} from "@pi-tray/ui/AutoTextScale";
-import {CUSTOM_ICON_MAP} from "../custom_icons.ts";
+import {AutoTextScale} from "./AutoTextScale";
+import {CUSTOM_ICON_MAP} from "./custom_icons";
 
 export const CustomDynamicIcon = ({name, className = "", fallback_autoscale = true}: {name: string, className?: string, fallback_autoscale?: boolean}) => {
     if (CUSTOM_ICON_MAP.has(name)) {
