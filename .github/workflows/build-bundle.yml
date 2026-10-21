@@ -200,11 +200,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           release_tag="${{ needs.check.outputs.release_tag }}"
-          
+
+          # the artifacts keep each bundle type in its own folder, and macos also includes the .app folder itself
+          mapfile -t assets < <(find dist-bins -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' -o -name '*.msi' \))
+          printf 'Uploading %s\n' "${assets[@]}"
+
           if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            gh release upload "$release_tag" dist-bins/* --repo "${{ github.repository }}" --clobber
+            gh release upload "$release_tag" "${assets[@]}" --repo "${{ github.repository }}" --clobber
           else
-            gh release create "$release_tag" dist-bins/* --repo "${{ github.repository }}" --title "$release_tag" --generate-notes --latest=false
+            gh release create "$release_tag" "${assets[@]}" --repo "${{ github.repository }}" --title "$release_tag" --generate-notes --latest=false
           fi
 
       - name: Update the rolling editor-latest release
@@ -216,4 +220,7 @@ jobs:
               --notes "Rolling release reflecting the absolute newest stable compilation of the editor desktop binary applications." \
               --latest=false
           fi
-          gh release upload editor-latest dist-bins/* --repo "${{ github.repository }}" --clobber
+          # the artifacts keep each bundle type in its own folder, and macos also includes the .app folder itself
+          mapfile -t assets < <(find dist-bins -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' -o -name '*.msi' \))
+          printf 'Uploading %s\n' "${assets[@]}"
+          gh release upload editor-latest "${assets[@]}" --repo "${{ github.repository }}" --clobber
