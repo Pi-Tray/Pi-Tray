@@ -1,0 +1,3 @@
+# serial 1
+release namespaces="client-update@pi-tray.ollieg.codes" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDyWCJTunDGmQJg1yLqJ+VfE5dOVdBn4MgBYCYOeryYF
+recovery namespaces="trusted-keys@pi-tray.ollieg.codes" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKnq9MwWeRvCAIFNNmZXVukLDeyI+vDyR0uGgs3bB/K9

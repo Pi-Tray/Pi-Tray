@@ -66,6 +66,9 @@ importers:
       resedit:
         specifier: ^2.0.3
         version: 2.0.3
+      tar:
+        specifier: ^7.4.3
+        version: 7.5.22
 
   apps/cli:
     dependencies:

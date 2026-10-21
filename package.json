@@ -13,7 +13,8 @@
         "@yao-pkg/pkg": "^6.23.0",
         "minimist": "catalog:",
         "pe-library": "^1.0.1",
-        "resedit": "^2.0.3"
+        "resedit": "^2.0.3",
+        "tar": "^7.4.3"
     },
     "packageManager": "pnpm@10.28.0",
     "engines": {

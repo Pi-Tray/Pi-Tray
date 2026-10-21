@@ -10,3 +10,6 @@ out/
 exe/
 apps/cli/bundled/
 .pkg-config,json
+
+# built by scripts/pack-client-update.mjs
+apps/editor/src-tauri/client-update/

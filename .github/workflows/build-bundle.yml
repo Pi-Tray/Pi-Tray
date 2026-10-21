@@ -23,6 +23,8 @@ on:
       - "packages/ui/**"
       - "scripts/**"
       - "package.json"
+      - "build/keys/**"
+      - "apps/client/**"
       - "pnpm-lock.yaml"
       - ".github/workflows/build-bundle.yml"
 
@@ -78,6 +80,8 @@ jobs:
             args: ""
 
     runs-on: ${{ matrix.platform }}
+    # the client signing key is a secret of the protected release environment, only available to tag builds
+    environment: ${{ github.ref_type == 'tag' && 'release' || 'ci' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -130,6 +134,8 @@ jobs:
         id: tauri-build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # signs the client update bundled into the app, see scripts/pack-client-update.mjs
+          CLIENT_SIGNING_KEY: ${{ secrets.CLIENT_SIGNING_KEY }}
         with:
           projectPath: apps/editor
           tauriScript: pnpm tauri

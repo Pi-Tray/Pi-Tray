@@ -6,7 +6,7 @@
   "build": {
     "beforeDevCommand": "node ../../scripts/stop-dev-cli.mjs && pnpm run dev:vite",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "pnpm run build && node ../../scripts/ensure-cli-sidecar.mjs",
+    "beforeBuildCommand": "pnpm run build && node ../../scripts/ensure-cli-sidecar.mjs && node ../../scripts/pack-client-update.mjs",
     "frontendDist": "../dist"
   },
   "app": {
@@ -38,6 +38,9 @@
       "icons/icon.ico"
     ],
     "externalBin": ["binaries/pi-tray"],
+    "resources": {
+      "client-update/": "client-update/"
+    },
     "windows": {
       "nsis": {
         "installerHooks": "./windows/hooks.nsh"
