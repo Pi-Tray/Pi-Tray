@@ -1,7 +1,7 @@
 import {useCallback, useMemo} from "react";
 import {Activity} from "lucide-react";
 
-import {ButtonDisplay, PushButtonFace} from "@pi-tray/ui/PushButtonFace";
+import {PushButtonDisplay, PushButtonFace} from "@pi-tray/ui/PushButtonFace";
 
 import {useGridCell} from "../../util/grid";
 import {useAsset} from "../../util/assets.ts";
@@ -33,7 +33,7 @@ export const PushButton = ({x, y, on_click, highlighted, className}: PushButtonP
 
     const background_asset = useAsset(cell?.background);
 
-    const display = useMemo<ButtonDisplay | null>(
+    const display = useMemo<PushButtonDisplay | null>(
         () => cell ? {text: cell.text || "", text_is_icon: cell.text_is_icon || false, background_url: background_asset?.preview_url ?? null} : null,
         [cell?.text, cell?.text_is_icon, background_asset?.preview_url]
     );
