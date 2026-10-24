@@ -476,7 +476,10 @@ for account_name in "${account_names[@]}"; do
     elif [ "${account_is_main[$account_name]}" = yes ] && [ -n "$first_user" ] && [[ "$first_user_shell" == */nologin ]] && [ -x /usr/lib/userconf-pi/userconf ]; then
         # the image's untouched default user, renamed the same way raspberry pi os's own first boot setup does it
         echo "Renaming the default user $first_user to $account_name"
-        /usr/lib/userconf-pi/userconf "$account_name" "" || fail "renaming the default user failed"
+        # userconf ends by starting getty@tty1, which the kiosk masks, so it reports failure even after renaming.
+        # whether the account now exists is what actually says if it worked
+        /usr/lib/userconf-pi/userconf "$account_name" "" || true
+        getent passwd "$account_name" > /dev/null || fail "renaming the default user failed"
         first_user="$account_name"
         first_user_shell="/bin/bash"
     else
