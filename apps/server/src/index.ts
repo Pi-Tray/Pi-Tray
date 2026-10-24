@@ -18,7 +18,6 @@ import {CloseCode, handle_login_server, Session, start_server_session} from "@pi
 import {get_editor_public_key, load_identities} from "./identity";
 import {find_paired_key, touch_paired_device} from "./paired_devices";
 import {broadcast_paired_devices, get_pairing_state, pair_unknown_device, pairing_connection_closed} from "./pairing";
-import {handle_asset_request} from "./assets";
 import {live_client_connected, live_client_disconnected} from "./live/runner";
 import {apply_arg_overrides, SERVER_CONFIG_FILE} from "@pi-tray/server-config";
 import {load_server_config} from "./config";
@@ -27,6 +26,7 @@ import * as _handlers from "./handlers";
 import {create_address_filter} from "./network_filter";
 import {register_for_shutdown} from "./shutdown";
 import {app_version} from "./version";
+import {handle_http_request} from "./http";
 const handlers: { [action: string]: MessageHandler | undefined } = _handlers;
 Object.freeze(handlers);
 
@@ -62,8 +62,7 @@ if (config.allowed_networks.length === 0) {
 
 console.log(`Starting WebSocket server on ws://${host}:${port}`);
 
-// assets are served over plain http on the same port, so the websocket only has to carry references to them
-const http_server = createServer(handle_asset_request);
+const http_server = createServer(handle_http_request);
 const ws_server = new WebSocketServer({ server: http_server });
 
 register_for_shutdown(http_server, ws_server);
