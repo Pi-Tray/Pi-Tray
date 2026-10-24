@@ -65,7 +65,8 @@ export type ServerMessage =
     | {action: "reload", payload?: undefined}
     | {action: "plugins_reloaded", payload?: undefined}
     | {action: "error", payload: {for: unknown}}
-    | {action: "invalid", payload: {for: unknown}};
+    | {action: "invalid", payload: {for: unknown}}
+    | {action: "client_update", payload: {version: string, built_at: number}};
 
 /**
  * Parses a message from the server, returning null for anything that isn't a well-formed message.<br>
