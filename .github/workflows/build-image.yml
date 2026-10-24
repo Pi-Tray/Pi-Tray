@@ -37,6 +37,7 @@ jobs:
       should_build: ${{ steps.resolve.outputs.should_build }}
       should_publish: ${{ steps.resolve.outputs.should_publish }}
       release_tag: ${{ steps.resolve.outputs.release_tag }}
+      source_ref: ${{ steps.resolve.outputs.source_ref }}
 
     steps:
       - name: Resolve the latest base image
@@ -54,6 +55,19 @@ jobs:
           if [ "${{ github.event_name }}" = "schedule" ]; then
             # one automatic release per base image, so an existing release means it's already been built
             release_tag="image-os-$base_image_name"
+          
+            # rebuild the latest stable image release on the new base, never whatever main has right now
+            source_ref=$(git ls-remote --tags --refs --sort=-v:refname "https://github.com/${{ github.repository }}.git" 'image-v*' \
+              | awk '{ sub("refs/tags/", "", $2); print $2 }' \
+              | grep -E '^image-v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1)
+
+            if [ -z "$source_ref" ]; then
+              echo "::error::No stable image-v* tag to build from"
+              exit 1
+            fi
+
+            echo "Building from $source_ref"
+            echo "source_ref=$source_ref" >> "$GITHUB_OUTPUT"
 
             if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
               echo "Already built, nothing to do"
@@ -100,6 +114,9 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
+        with:
+          # scheduled builds use the latest image release's tag, everything else the commit that triggered it
+          ref: ${{ needs.check.outputs.source_ref || github.sha }}
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
