@@ -13,3 +13,6 @@ apps/cli/bundled/
 
 # built by scripts/pack-client-update.mjs
 apps/editor/src-tauri/client-update/
+
+# test signing keys, see build/keys/README.md
+build/keys-dev/

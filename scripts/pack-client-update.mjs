@@ -1,10 +1,12 @@
 // packs the built client into the files a pi downloads to update itself, written to apps/editor/src-tauri/client-update/
 // and bundled into the app from there:
 //   client.tgz                   the client's dist folder
-//   client-manifest.json         {version, built_at, sha256, size} of client.tgz
-//   client-manifest.json.sig     the release key's signature of the manifest, only when CLIENT_SIGNING_KEY is set
+//   client-manifest.txt          version, built_at (unix seconds), sha256 and size of client.tgz, as key=value lines
+//   client-manifest.txt.sig      the release key's signature of the manifest, only when CLIENT_SIGNING_KEY is set
 //   allowed_signers(.sig)        the trusted keys and their recovery signature, copied from build/keys
-// without a key the manifest is left unsigned, which pis refuse, so local builds work but can't update a pi
+// without a key the manifest is left unsigned, which pis refuse, so local builds work but can't update a pi.
+// the manifest is key=value rather than json so the pi's updater can read it with nothing but bash.
+// CLIENT_KEYS_DIR swaps build/keys for another set, e.g. a test key pair trusted by a test pi
 
 import {execFileSync, execSync} from "child_process";
 import {createHash} from "crypto";
@@ -21,7 +23,7 @@ const RELEASE_NAMESPACE = "client-update@pi-tray.ollieg.codes";
 
 const repo_root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const client_dist = path.join(repo_root, "apps/client/dist");
-const keys_dir = path.join(repo_root, "build/keys");
+const keys_dir = path.resolve(repo_root, process.env.CLIENT_KEYS_DIR ?? "build/keys");
 const output_dir = path.join(repo_root, "apps/editor/src-tauri/client-update");
 
 const signing_key = process.env.CLIENT_SIGNING_KEY?.trim();
@@ -48,12 +50,12 @@ await tar.create({file: archive_path, cwd: client_dist, gzip: {level: 9}, portab
 
 const archive = fs.readFileSync(archive_path);
 
-// the commit's time, so every platform's build of one commit agrees, and a later commit is always newer
+// the commit's time in unix seconds, so every platform's build of one commit agrees, and a later commit is always newer
 let built_at;
 try {
-    built_at = new Date(Number(execFileSync("git", ["log", "-1", "--format=%ct"], {cwd: repo_root, encoding: "utf-8"}).trim()) * 1000).toISOString();
+    built_at = Number(execFileSync("git", ["log", "-1", "--format=%ct"], {cwd: repo_root, encoding: "utf-8"}).trim());
 } catch {
-    built_at = new Date().toISOString();
+    built_at = Math.floor(Date.now() / 1000);
 }
 
 const manifest = {
@@ -63,8 +65,8 @@ const manifest = {
     size: archive.length
 };
 
-const manifest_path = path.join(output_dir, "client-manifest.json");
-fs.writeFileSync(manifest_path, JSON.stringify(manifest, null, 4) + "\n");
+const manifest_path = path.join(output_dir, "client-manifest.txt");
+fs.writeFileSync(manifest_path, Object.entries(manifest).map(([key, value]) => `${key}=${value}\n`).join(""));
 
 for (const file_name of ["allowed_signers", "allowed_signers.sig"]) {
     fs.copyFileSync(path.join(keys_dir, file_name), path.join(output_dir, file_name));
@@ -82,7 +84,7 @@ if (signing_key) {
         const release_line = fs.readFileSync(path.join(keys_dir, "allowed_signers"), "utf-8").split("\n").find((line) => line.startsWith("release "));
 
         if (!release_line?.endsWith(public_key)) {
-            throw new Error("CLIENT_SIGNING_KEY isn't the release key in build/keys/allowed_signers");
+            throw new Error(`CLIENT_SIGNING_KEY isn't the release key in ${path.relative(repo_root, keys_dir)}/allowed_signers`);
         }
 
         execFileSync("ssh-keygen", ["-Y", "sign", "-f", key_path, "-n", RELEASE_NAMESPACE, manifest_path], {stdio: ["ignore", "inherit", "inherit"]});
