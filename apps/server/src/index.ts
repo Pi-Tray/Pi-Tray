@@ -36,6 +36,7 @@ const EDITOR_ONLY_ACTIONS = new Set([
     "submit_pairing_code",
     "list_paired_devices",
     "revoke_paired_device",
+    "retry_client_update",
     "reload",
     "reload_plugins"
 ]);

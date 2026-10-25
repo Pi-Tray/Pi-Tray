@@ -51,6 +51,25 @@ export interface PairedDeviceInfo {
 
     /** Whether the device has a live connection to the server right now. Derived, not stored. */
     online: boolean;
+
+    /** The Pi-Tray version of the client the device last ran, or null if it hasn't said, e.g. a client older than 0.3.0. */
+    client_version: string | null;
+
+    /**
+     * The version of a client update the device installed, then rolled back as it didn't log in, or null if none.<br>
+     * The device won't install it again until the editor asks it to retry.
+     */
+    rejected_update: string | null;
+}
+
+/**
+ * What a client tells the server about itself, once after each login and again whenever it changes.
+ */
+export interface ClientInfo {
+    version: string;
+
+    /** See {@link PairedDeviceInfo.rejected_update}. Left out when the client doesn't know yet, keeping what the server has */
+    rejected_update?: string | null;
 }
 
 export type ServerMessage =
@@ -63,6 +82,7 @@ export type ServerMessage =
     | {action: "push_ok", payload: CellCoordinates}
     | {action: "push_error", payload: CellCoordinates}
     | {action: "reload", payload?: undefined}
+    | {action: "retry_client_update", payload?: undefined}
     | {action: "plugins_reloaded", payload?: undefined}
     | {action: "error", payload: {for: unknown}}
     | {action: "invalid", payload: {for: unknown}};

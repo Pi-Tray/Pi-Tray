@@ -2,18 +2,22 @@
 # Installs a newer Pi-Tray client from the Pi-Tray server, if it offers one signed by a trusted key.
 #
 # Usage: pi-tray-update [--force]    check the server and install its client if it's newer
+#        pi-tray-update --retry      the same, but first forgets which client failed to start, see below
 #        pi-tray-update --rollback   go back to the client that was installed before the current one
 #        pi-tray-update --verify     run by pi-tray-update-verify.service after an install, see below
 #
 # --force installs the server's client even if it isn't newer, or one that failed to start before, for testing.
 # It never skips the signature checks.
 #
+# Exits 3 when the server's client is the one that failed to start last time, so it wasn't installed.
+#
 # Each client lives in /opt/pi-tray/releases/<built_at>-<version>, and /opt/pi-tray/client is a symlink to the current
 # one, which the kiosk opens. The page asks for a check through pi-tray-update-trigger, and reloads itself after one.
 #
 # After an install, pi-tray-update-verify.service watches the kiosk's console log. Once the page reloads, or the kiosk
 # restarts, the new client has a few minutes to log in to the server and log "pi-tray client ready <version>". If it
-# doesn't, the previous client is put back, the kiosk restarted, and that release is never installed again without --force.
+# doesn't, the previous client is put back, the kiosk restarted, and that release isn't installed again until --retry,
+# which the editor's devices page can ask for through the client, or --force.
 #
 # Trust comes from /var/lib/pi-tray-updater/allowed_signers, in OpenSSH's allowed signers format, starting "# serial N".
 # The server's copy replaces it when the recovery key signed it and its serial is higher, which is how keys are rotated.
@@ -56,13 +60,15 @@ fail() {
 }
 
 force=no
+retry=no
 mode=update
 for argument in "$@"; do
     case "$argument" in
         --force) force=yes ;;
+        --retry) retry=yes ;;
         --rollback) mode=rollback ;;
         --verify) mode=verify ;;
-        *) fail "unknown option $argument, expected --force, --rollback or --verify" ;;
+        *) fail "unknown option $argument, expected --force, --retry, --rollback or --verify" ;;
     esac
 done
 
@@ -223,6 +229,11 @@ if [ "$mode" = verify ]; then
     exit 1
 fi
 
+if [ "$retry" = yes ] && [ -f "$rejected_file" ]; then
+    log "giving $(cat "$rejected_file") another chance to start"
+    rm -f "$rejected_file"
+fi
+
 # --- where the server is ---
 
 # the same parsing as the kiosk's .xinitrc: a byte order mark, comments, blank lines and carriage returns are ignored
@@ -343,8 +354,8 @@ if [ "$force" = no ] && [ "$built_at" -le "$(built_at_of "$current")" ]; then
 fi
 
 if [ "$force" = no ] && [ "$(cat "$rejected_file" 2>/dev/null)" = "$release_name" ]; then
-    log "$release_name failed to start last time, so it won't be installed again until the server offers a newer one"
-    exit 0
+    log "$release_name failed to start last time, so it won't be installed again until it's retried or the server offers a newer one"
+    exit 3
 fi
 
 # --- the archive: exactly what the manifest says, holding only files and folders ---

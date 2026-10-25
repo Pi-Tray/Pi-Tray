@@ -6,7 +6,9 @@ import {data_dir, in_data_dir} from "@pi-tray/paths";
 const PAIRED_DEVICES_FILE = in_data_dir("paired_devices.json");
 
 // online is derived from the live connections, not stored, and public_key is the map key
-type StoredPairedDevice = Omit<PairedDeviceInfo, "public_key" | "online">;
+// the client fields are missing from devices saved before they existed
+type StoredPairedDevice = Omit<PairedDeviceInfo, "public_key" | "online" | "client_version" | "rejected_update">
+    & Partial<Pick<PairedDeviceInfo, "client_version" | "rejected_update">>;
 
 // keyed by public key
 let paired_devices = new Map<string, StoredPairedDevice>();
@@ -64,10 +66,36 @@ export const touch_paired_device = (public_key: string) => {
     save_paired_devices();
 }
 
+/**
+ * Records what a paired device's client said about itself.
+ * @param rejected_update undefined keeps what's stored
+ * @returns whether anything changed
+ */
+export const update_paired_device_client = (public_key: string, client_version: string, rejected_update: string | null | undefined): boolean => {
+    const device = paired_devices.get(public_key);
+
+    if (!device) {
+        return false;
+    }
+
+    const new_rejected_update = rejected_update === undefined ? device.rejected_update ?? null : rejected_update;
+
+    if (device.client_version === client_version && (device.rejected_update ?? null) === new_rejected_update) {
+        return false;
+    }
+
+    device.client_version = client_version;
+    device.rejected_update = new_rejected_update;
+    save_paired_devices();
+    return true;
+}
+
 export const list_paired_devices = (online_keys: Set<string>): PairedDeviceInfo[] => {
     return Array.from(paired_devices, ([public_key, device]) => ({
         public_key,
         ...device,
+        client_version: device.client_version ?? null,
+        rejected_update: device.rejected_update ?? null,
         online: online_keys.has(public_key)
     }));
 }

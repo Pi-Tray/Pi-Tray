@@ -1,13 +1,25 @@
 #!/bin/bash
 # Run by pi-tray-update.socket for each connection to 127.0.0.1:31416, with the connection as stdin.
-# Any request means "check for a client update now". It runs pi-tray-update, then answers with what happened, so the page
-# knows when to reload without watching for it:
-#   {"installed":true,"release":"<built_at>-<version>"}   a new client is in place
-#   {"installed":false}                                    nothing newer, or another check was already running
-#   {"installed":false,"failed":true}                      the check failed, the journal says why
-# Nothing in the request is used, so a stray or hostile one can at most cause an extra check.
+# A request to /retry runs pi-tray-update --retry, so a client that failed to start gets another go. Any other request
+# means "check for a client update now". It runs pi-tray-update, then answers with what happened, so the page knows when
+# to reload without watching for it:
+#   {"installed":true,"release":"<built_at>-<version>"}     a new client is in place
+#   {"installed":false}                                      nothing newer, or another check was already running
+#   {"installed":false,"rejected":"<built_at>-<version>"}   the server's client failed to start last time, so it was skipped
+#   {"installed":false,"failed":true}                        the check failed, the journal says why
+# Nothing else in the request is used, so a stray or hostile one can at most cause an extra check, or one retry.
 
 current_link="${PI_TRAY_INSTALL_DIR:-/opt/pi-tray}/client"
+rejected_file="${PI_TRAY_UPDATER_STATE_DIR:-/var/lib/pi-tray-updater}/rejected"
+updater="${PI_TRAY_UPDATER:-/usr/local/sbin/pi-tray-update}"
+
+# the request line, e.g. "POST /retry HTTP/1.1"
+IFS=' ' read -r -t 2 _method request_path _rest <&0
+
+updater_options=()
+if [ "${request_path%%\?*}" = "/retry" ]; then
+    updater_options+=(--retry)
+fi
 
 # reads up to the end of the headers, so the reply doesn't reset a connection with unread data. capped, so a client that
 # never finishes can't hold this open
@@ -19,13 +31,16 @@ done
 before=$(readlink "$current_link" 2>/dev/null)
 
 # its output goes to stderr, the journal, so nothing it prints can end up in the reply
-/usr/local/sbin/pi-tray-update >&2
+"$updater" "${updater_options[@]}" >&2
 status=$?
 
 after=$(readlink "$current_link" 2>/dev/null)
+rejected=$(cat "$rejected_file" 2>/dev/null)
 
 if [ -n "$after" ] && [ "$after" != "$before" ]; then
     body="{\"installed\":true,\"release\":\"$(basename "$after")\"}"
+elif [ "$status" -eq 3 ] && [[ "$rejected" =~ ^[0-9]+-[0-9A-Za-z.+-]+$ ]]; then
+    body="{\"installed\":false,\"rejected\":\"$rejected\"}"
 elif [ "$status" -ne 0 ]; then
     body='{"installed":false,"failed":true}'
 else

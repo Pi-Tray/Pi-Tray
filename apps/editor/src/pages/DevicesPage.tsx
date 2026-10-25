@@ -1,10 +1,11 @@
 import {useChannel} from "../contexts/WSProvider.tsx";
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {PairedDeviceInfo} from "@pi-tray/types";
-import {Clock, KeyRound, MonitorSmartphone, Plus, RefreshCw, RotateCcw, Trash2} from "lucide-react";
+import {Clock, KeyRound, MonitorSmartphone, Plus, RefreshCw, RotateCcw, Trash2, TriangleAlert} from "lucide-react";
 import {Link} from "wouter";
 import {CustomDynamicIcon} from "@pi-tray/ui/CustomDynamicIcon";
 import {show_confirm} from "../util/dialogs.ts";
+import {editor_version} from "../version.ts";
 
 const format_date = (date: string | number | Date) =>
     new Date(date).toLocaleString(undefined, {dateStyle: "medium", timeStyle: "short"});
@@ -33,6 +34,14 @@ const PairedDevice = ({device}: {device: PairedDeviceInfo}) => {
         },
         [device.public_key, device.name, channel]
     );
+
+    const retry_update = useCallback(
+        () => channel?.send({action: "retry_client_update", payload: {public_key: device.public_key}}),
+        [device.public_key, channel]
+    );
+
+    // the server offers its own version of the client, which is the editor's unless they're mismatched
+    const client_outdated = device.client_version !== null && device.client_version !== editor_version;
 
     const last_seen_relative = useMemo(
         () => {
@@ -89,7 +98,30 @@ const PairedDevice = ({device}: {device: PairedDeviceInfo}) => {
                                 {device.last_seen ? `Last seen ${format_date(device.last_seen)} (${last_seen_relative})` : "Never seen"}
                             </span>
                         )}
+                        {device.client_version && (
+                            <span
+                                className={client_outdated ? "text-warning" : undefined}
+                                title={client_outdated ? `This editor is ${editor_version}` : undefined}
+                            >
+                                Client {device.client_version}{client_outdated && " (not the latest)"}
+                            </span>
+                        )}
                     </div>
+
+                    {device.rejected_update && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-warning">
+                            <TriangleAlert className="w-3 h-3 shrink-0"/>
+                            <span>Update to {device.rejected_update} didn't start, so it was rolled back</span>
+                            <button
+                                className="btn btn-xs btn-warning btn-outline"
+                                onClick={retry_update}
+                                disabled={!channel || !device.online}
+                                title={device.online ? undefined : "The device needs to be online to retry"}
+                            >
+                                Retry
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 <button

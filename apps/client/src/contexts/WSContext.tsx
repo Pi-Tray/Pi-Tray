@@ -1,5 +1,5 @@
 import {createContext, useCallback, useContext, useEffect, useMemo, useRef, useState} from "react";
-import {CellCoordinates, ServerMessage} from "@pi-tray/types";
+import {CellCoordinates, ClientInfo, ServerMessage} from "@pi-tray/types";
 import {
     await_pairing_result,
     create_pairing_code_client,
@@ -18,7 +18,8 @@ import {load_identity, save_trusted_server} from "../util/identity.ts";
 export type ClientMessage =
     | {action: "push", payload: CellCoordinates}
     | {action: "all_buttons"}
-    | {action: "size"};
+    | {action: "size"}
+    | {action: "client_info", payload: ClientInfo};
 
 // what crosses the channel in either direction, before we narrow it to a known message
 type WireMessage = {action: string, payload?: unknown};
