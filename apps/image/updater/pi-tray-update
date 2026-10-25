@@ -50,6 +50,10 @@ ARCHIVE_FETCH_SECONDS=300
 # how long a new client has to log in once it's loaded. generous, as the server has only just been reached
 READY_SECONDS=180
 
+# how long to wait for the page to reload or the kiosk to restart. the page reloads once it's been idle for a minute,
+# so this only runs out if something else is wrong, and then nothing shows the new client failed, so it's kept
+LOAD_SECONDS=1800
+
 log() {
     echo "pi-tray-update: $*"
 }
@@ -160,6 +164,9 @@ if [ "$mode" = verify ]; then
     pending_version="${pending_release#*-}"
     # chromium quotes the message, so 0.3.0 can't match 0.3.0-beta.1
     ready_line="\"pi-tray client ready $pending_version\""
+
+    # the time to see the page start loading, then once it has, the time to see it log in
+    load_deadline=$(($(date +%s) + LOAD_SECONDS))
     deadline=""
 
     # byte offsets, not characters
@@ -191,8 +198,9 @@ if [ "$mode" = verify ]; then
                     log "the kiosk is loading $pending_release, it has $READY_SECONDS seconds to log in"
                 fi
 
-                # only counts once loading started, as a line from before the reload came from the previous client
-                if [ -n "$deadline" ] && grep -qF -e "$ready_line" <<< "$whole_lines"; then
+                # counts even without a marker, e.g. after a reload by a client too old to log one, as the previous
+                # client logs its own version
+                if grep -qF -e "$ready_line" <<< "$whole_lines"; then
                     log "$pending_release started and logged in"
                     rm -f "$pending_file"
                     if [ "$(cat "$rejected_file" 2>/dev/null)" = "$pending_release" ]; then
@@ -205,6 +213,12 @@ if [ "$mode" = verify ]; then
 
         if [ -n "$deadline" ] && [ "$(date +%s)" -ge "$deadline" ]; then
             break
+        fi
+
+        if [ -z "$deadline" ] && [ "$(date +%s)" -ge "$load_deadline" ]; then
+            log "the kiosk didn't load $pending_release within $LOAD_SECONDS seconds, so it can't be verified and is kept"
+            rm -f "$pending_file"
+            exit 0
         fi
 
         sleep 1
