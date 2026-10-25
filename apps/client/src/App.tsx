@@ -5,6 +5,12 @@ import {WSPushButtonGrid} from "./components/PushButtonGrid";
 import {PairingUI} from "./components/PairingUI";
 
 import "./style/App.css";
+import {useClientUpdates} from "./util/client_update.ts";
+
+const ClientUpdates = () => {
+    useClientUpdates();
+    return null;
+}
 
 export default function App() {
     // TODO: default is useful for dev but for prod it should probably be erroneous? and what if dev server uses other port?
@@ -12,6 +18,8 @@ export default function App() {
 
     return (
         <WSProvider url={ws_url}>
+            <ClientUpdates />
+
             <WSStatus />
             <PairingUI />
 
