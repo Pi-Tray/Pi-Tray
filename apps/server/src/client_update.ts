@@ -36,7 +36,7 @@ const CLIENT_UPDATE_FILES = new Map<string, string>([
     ["allowed_signers.sig", "text/plain"]
 ]);
 
-export interface OfferedClientUpdate {
+interface OfferedClientUpdate {
     version: string;
 
     /** When it was built, in unix seconds. Pis compare this rather than the version to decide whether it's newer */
@@ -64,11 +64,7 @@ const read_offered_update = (update_dir: string): OfferedClientUpdate | null => 
 
 const client_update_dir = find_client_update_dir();
 
-/**
- * The client update this server offers, for telling clients after they log in, or null if it has none.<br>
- * Only a hint for deciding whether to ask the pi's updater to check: the updater verifies everything it downloads itself.
- */
-export const offered_client_update: OfferedClientUpdate | null = client_update_dir ? read_offered_update(client_update_dir) : null;
+const offered_client_update: OfferedClientUpdate | null = client_update_dir ? read_offered_update(client_update_dir) : null;
 
 if (!offered_client_update) {
     console.log("No client update to offer, so Pis keep the client they have");

@@ -27,7 +27,6 @@ import {create_address_filter} from "./network_filter";
 import {register_for_shutdown} from "./shutdown";
 import {app_version} from "./version";
 import {handle_http_request} from "./http";
-import {offered_client_update} from "./client_update";
 const handlers: { [action: string]: MessageHandler | undefined } = _handlers;
 Object.freeze(handlers);
 
@@ -178,9 +177,6 @@ ws_server.on("connection", async ws => {
     // a device just came online, let the editors' devices page reflect it live
     if (client.identity.role === "device") {
         broadcast_paired_devices();
-
-        // lets the device ask its updater to check if this server has a different client to its own
-        client.send({action: "client_update", payload: offered_client_update});
     }
 
     // terminate a client that misses a heartbeat; ws ping/pong are control frames, so they never reach
