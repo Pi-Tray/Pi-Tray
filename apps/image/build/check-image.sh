@@ -55,7 +55,8 @@ grep -qs "DenyUsers pi-tray" "$root_dir/etc/ssh/sshd_config.d/10-pi-tray.conf" |
 
 # --- the kiosk is complete ---
 
-[ -f "$root_dir/opt/pi-tray/client/index.html" ] || fail "client index.html is missing"
+[ "$(readlink "$root_dir/opt/pi-tray/client")" = "releases/0-image" ] || fail "/opt/pi-tray/client isn't a link to releases/0-image"
+[ -f "$root_dir/opt/pi-tray/releases/0-image/index.html" ] || fail "client index.html is missing"
 [ -x "$root_dir/home/pi-tray/.xinitrc" ] || fail ".xinitrc is missing or not executable"
 [ -L "$root_dir/etc/systemd/system/multi-user.target.wants/pi-tray-kiosk.service" ] || fail "kiosk service isn't enabled"
 [ "$(readlink "$root_dir/etc/systemd/system/getty@tty1.service")" = "/dev/null" ] || fail "getty on tty1 isn't masked"
@@ -72,7 +73,15 @@ grep -qs "enable pi-tray-kiosk.service" "$root_dir/etc/systemd/system-preset/10-
 [ "$(chroot "$root_dir" stat -c '%U:%G %a' /var/log/pi-tray 2>/dev/null)" = "pi-tray:adm 2750" ] || fail "/var/log/pi-tray is missing or doesn't have pi-tray:adm 2750"
 grep -qs "/var/log/pi-tray/console.log" "$root_dir/home/pi-tray/.xinitrc" || fail ".xinitrc doesn't log the console to /var/log/pi-tray"
 
-for binary in chromium startx unclutter xset; do
+[ -x "$root_dir/usr/local/sbin/pi-tray-update" ] || fail "client updater is missing or not executable"
+[ -x "$root_dir/usr/local/sbin/pi-tray-update-trigger" ] || fail "client updater trigger is missing or not executable"
+[ -f "$root_dir/etc/systemd/system/pi-tray-update@.service" ] || fail "client updater service is missing"
+[ -L "$root_dir/etc/systemd/system/sockets.target.wants/pi-tray-update.socket" ] || fail "client updater socket isn't enabled"
+grep -qs "enable pi-tray-update.socket" "$root_dir/etc/systemd/system-preset/10-pi-tray.preset" || fail "client updater preset is missing"
+head -n 1 "$root_dir/var/lib/pi-tray-updater/allowed_signers" 2>/dev/null | grep -qx "# serial [0-9]*" || fail "the updater's trusted keys are missing"
+grep -qs "^release " "$root_dir/var/lib/pi-tray-updater/allowed_signers" || fail "the updater's trusted keys have no release key"
+
+for binary in chromium startx unclutter xset curl ssh-keygen flock sha256sum; do
     chroot "$root_dir" /bin/sh -c "command -v $binary" > /dev/null || fail "$binary is not installed"
 done
 

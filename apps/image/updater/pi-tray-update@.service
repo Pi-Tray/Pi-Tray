@@ -1,0 +1,26 @@
+[Unit]
+Description=Pi-Tray client update check
+
+[Service]
+ExecStart=/usr/local/sbin/pi-tray-update-trigger
+StandardInput=socket
+StandardOutput=journal
+StandardError=journal
+
+# a stuck download can't run forever
+TimeoutStartSec=15min
+RuntimeMaxSec=15min
+
+# root only needs to write the releases and its own state
+ProtectSystem=strict
+ReadWritePaths=/opt/pi-tray /var/lib/pi-tray-updater
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes

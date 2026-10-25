@@ -1,0 +1,11 @@
+[Unit]
+Description=Pi-Tray client update trigger
+
+[Socket]
+# only reachable from the pi itself. the kiosk's page posts here after each login to its server
+ListenStream=127.0.0.1:31416
+Accept=yes
+MaxConnections=4
+
+[Install]
+WantedBy=sockets.target

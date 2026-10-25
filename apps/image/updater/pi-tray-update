@@ -1,0 +1,269 @@
+#!/bin/bash
+# Installs a newer Pi-Tray client from the Pi-Tray server, if it offers one signed by a trusted key.
+#
+# Usage: pi-tray-update [--force]    check the server and install its client if it's newer
+#        pi-tray-update --rollback   go back to the client that was installed before the current one
+#
+# --force installs the server's client even if it isn't newer, for testing. It never skips the signature checks.
+#
+# Each client lives in /opt/pi-tray/releases/<built_at>-<version>, and /opt/pi-tray/client is a symlink to the current
+# one, which the kiosk opens. The page asks for a check through pi-tray-update-trigger, and reloads itself after one.
+#
+# Trust comes from /var/lib/pi-tray-updater/allowed_signers, in OpenSSH's allowed signers format, starting "# serial N".
+# The server's copy replaces it when the recovery key signed it and its serial is higher, which is how keys are rotated.
+
+set -euo pipefail
+
+RELEASE_NAMESPACE="client-update@pi-tray.ollieg.codes"
+KEYS_NAMESPACE="trusted-keys@pi-tray.ollieg.codes"
+
+# overridable for testing, never set in normal use
+state_dir="${PI_TRAY_UPDATER_STATE_DIR:-/var/lib/pi-tray-updater}"
+install_dir="${PI_TRAY_INSTALL_DIR:-/opt/pi-tray}"
+server_file="${PI_TRAY_SERVER_FILE:-/boot/firmware/pi-tray.txt}"
+
+releases_dir="$install_dir/releases"
+current_link="$install_dir/client"
+trusted_keys="$state_dir/allowed_signers"
+
+SMALL_FILE_LIMIT=65536
+ARCHIVE_LIMIT=$((64 * 1024 * 1024))
+FETCH_SECONDS=30
+ARCHIVE_FETCH_SECONDS=300
+
+log() {
+    echo "pi-tray-update: $*"
+}
+
+fail() {
+    echo "pi-tray-update: $*" >&2
+    exit 1
+}
+
+force=no
+rollback=no
+for argument in "$@"; do
+    case "$argument" in
+        --force) force=yes ;;
+        --rollback) rollback=yes ;;
+        *) fail "unknown option $argument, expected --force or --rollback" ;;
+    esac
+done
+
+[ "$(id -u)" = 0 ] || [ -n "${PI_TRAY_UPDATER_STATE_DIR:-}" ] || fail "run as root"
+[ -f "$trusted_keys" ] || fail "$trusted_keys is missing, so no update can be trusted"
+if [ -e "$current_link" ] && [ ! -L "$current_link" ]; then
+    fail "$current_link is a folder rather than a link to a release, move it into $releases_dir first"
+fi
+mkdir -p "$releases_dir"
+
+# one run at a time, a trigger while one is running has nothing to add
+exec 9> "$state_dir/lock"
+if ! flock -n 9; then
+    log "another update check is already running"
+    exit 0
+fi
+
+current_release() {
+    local target
+    target=$(readlink "$current_link" 2>/dev/null) || return 0
+    basename "$target"
+}
+
+# the release folder name starts with its built_at, 0 for one that didn't come from a signed update
+built_at_of() {
+    local built_at="${1%%-*}"
+    [[ "$built_at" =~ ^[0-9]+$ ]] && echo "$built_at" || echo 0
+}
+
+# swaps the client symlink in one step, so the kiosk never sees it missing
+point_client_at() {
+    local release_name="$1"
+    local previous
+    previous=$(current_release)
+
+    ln -sfn "releases/$release_name" "$current_link.new"
+    mv -T "$current_link.new" "$current_link"
+
+    if [ -n "$previous" ] && [ "$previous" != "$release_name" ]; then
+        echo "$previous" > "$state_dir/previous"
+    fi
+
+    log "client is now $release_name"
+}
+
+if [ "$rollback" = yes ]; then
+    previous=$(cat "$state_dir/previous" 2>/dev/null || true)
+    if [ -z "$previous" ] || [ ! -d "$releases_dir/$previous" ]; then
+        fail "there's no previous client to go back to"
+    fi
+
+    point_client_at "$previous"
+    exit 0
+fi
+
+# --- where the server is ---
+
+# the same parsing as the kiosk's .xinitrc: a byte order mark, comments, blank lines and carriage returns are ignored
+server_url=$(sed '1s/^\xEF\xBB\xBF//' "$server_file" 2>/dev/null | grep -v -e '^[[:space:]]*#' -e '^[[:space:]]*\r\?$' | head -n 1 | tr -d '\r[:space:]')
+case "$server_url" in
+    ws://*) server_base="http://${server_url#ws://}" ;;
+    wss://*) server_base="https://${server_url#wss://}" ;;
+    *) fail "$server_file doesn't hold a ws:// or wss:// address" ;;
+esac
+update_url="${server_base%/}/client-update"
+
+work_dir=$(mktemp -d "$state_dir/check.XXXXXX")
+staging_dir=""
+cleanup() {
+    rm -rf "$work_dir"
+    if [ -n "$staging_dir" ]; then
+        rm -rf "$staging_dir"
+    fi
+}
+trap cleanup EXIT
+
+fetch() {
+    local file_name="$1" limit="$2" seconds="$3"
+    curl --fail --silent --show-error --max-filesize "$limit" --max-time "$seconds" --output "$work_dir/$file_name" "$update_url/$file_name"
+}
+
+# a 404 means the server has nothing to offer, anything else that fails means it couldn't be reached
+manifest_status=$(curl --silent --max-filesize "$SMALL_FILE_LIMIT" --max-time "$FETCH_SECONDS" --output "$work_dir/client-manifest.txt" \
+    --write-out '%{http_code}' "$update_url/client-manifest.txt" || true)
+
+case "$manifest_status" in
+    200) ;;
+    404)
+        log "the server has no client update to offer"
+        exit 0
+        ;;
+    000)
+        # e.g. the PC is off, the next trigger tries again
+        log "couldn't reach the server at $server_base"
+        exit 0
+        ;;
+    *) fail "the server answered $manifest_status for the client manifest" ;;
+esac
+
+for file_name in client-manifest.txt.sig allowed_signers allowed_signers.sig; do
+    fetch "$file_name" "$SMALL_FILE_LIMIT" "$FETCH_SECONDS" || fail "couldn't download $file_name from $update_url"
+done
+
+# --- trusted keys: take the server's list if the recovery key signed it and it's newer ---
+
+serial_of() {
+    sed -n '1s/^# serial \([0-9]\{1,9\}\)$/\1/p' "$1"
+}
+
+current_serial=$(serial_of "$trusted_keys")
+offered_serial=$(serial_of "$work_dir/allowed_signers")
+[ -n "$current_serial" ] || fail "$trusted_keys doesn't start with '# serial N'"
+
+if [ -n "$offered_serial" ] && [ "$offered_serial" -gt "$current_serial" ]; then
+    if ssh-keygen -Y verify -f "$trusted_keys" -I recovery -n "$KEYS_NAMESPACE" -s "$work_dir/allowed_signers.sig" < "$work_dir/allowed_signers" > /dev/null 2>&1; then
+        install -m 600 "$work_dir/allowed_signers" "$trusted_keys.new"
+        mv -T "$trusted_keys.new" "$trusted_keys"
+        log "trusted keys updated to serial $offered_serial"
+    else
+        fail "the server's trusted keys (serial $offered_serial) aren't signed by the recovery key, so they were ignored"
+    fi
+fi
+
+# --- the manifest: signed by the release key, then read strictly ---
+
+if ! ssh-keygen -Y verify -f "$trusted_keys" -I release -n "$RELEASE_NAMESPACE" -s "$work_dir/client-manifest.txt.sig" < "$work_dir/client-manifest.txt" > /dev/null 2>&1; then
+    fail "the client update isn't signed by the release key, so it wasn't installed"
+fi
+
+declare -A manifest=()
+while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    [[ "$line" == *=* ]] || fail "the manifest has a line that isn't key=value"
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    case "$key" in
+        version|built_at|sha256|size) ;;
+        *) fail "the manifest has an unknown key '$key'" ;;
+    esac
+
+    [ -z "${manifest[$key]+set}" ] || fail "the manifest has '$key' twice"
+    manifest[$key]="$value"
+done < "$work_dir/client-manifest.txt"
+
+version="${manifest[version]:-}"
+built_at="${manifest[built_at]:-}"
+sha256="${manifest[sha256]:-}"
+size="${manifest[size]:-}"
+
+# the version and built_at name a folder, so neither can hold a / or ..
+if [[ ! "$version" =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]] || [[ "$version" == *..* ]]; then
+    fail "the manifest's version isn't valid"
+fi
+[[ "$built_at" =~ ^[0-9]{1,12}$ ]] || fail "the manifest's built_at isn't a number"
+[[ "$sha256" =~ ^[0-9a-f]{64}$ ]] || fail "the manifest's sha256 isn't valid"
+if [[ ! "$size" =~ ^[0-9]{1,10}$ ]] || [ "$size" -gt "$ARCHIVE_LIMIT" ]; then
+    fail "the manifest's size isn't valid"
+fi
+
+release_name="$built_at-$version"
+current=$(current_release)
+
+if [ "$release_name" = "$current" ]; then
+    log "$release_name is already installed"
+    exit 0
+fi
+
+if [ "$force" = no ] && [ "$built_at" -le "$(built_at_of "$current")" ]; then
+    log "$release_name isn't newer than ${current:-the installed client}"
+    exit 0
+fi
+
+# --- the archive: exactly what the manifest says, holding only files and folders ---
+
+fetch client.tgz "$ARCHIVE_LIMIT" "$ARCHIVE_FETCH_SECONDS" || fail "couldn't download client.tgz"
+
+[ "$(stat -c %s "$work_dir/client.tgz")" = "$size" ] || fail "client.tgz isn't the size the manifest says"
+[ "$(sha256sum "$work_dir/client.tgz" | cut -d' ' -f1)" = "$sha256" ] || fail "client.tgz doesn't match the manifest's sha256"
+
+# signed, so only a bad release could break these, but a root process extracting into /opt checks anyway
+if tar -tvzf "$work_dir/client.tgz" | grep -qv '^[-d]'; then
+    fail "client.tgz holds something other than files and folders"
+fi
+if tar -tzf "$work_dir/client.tgz" | grep -qE '^/|(^|/)\.\.(/|$)'; then
+    fail "client.tgz has a path outside its own folder"
+fi
+tar -tzf "$work_dir/client.tgz" | grep -qx 'index.html' || fail "client.tgz has no index.html"
+
+staging_dir="$releases_dir/.staging-$release_name"
+rm -rf "$staging_dir"
+mkdir -p "$staging_dir"
+
+tar -xzf "$work_dir/client.tgz" -C "$staging_dir" --no-same-owner --no-same-permissions
+
+chown -R root:root "$staging_dir" 2>/dev/null || true
+chmod -R u=rwX,go=rX "$staging_dir"
+
+# a leftover copy of this release, e.g. from before a rollback, is replaced by the freshly checked one
+rm -rf "${releases_dir:?}/$release_name"
+mv -T "$staging_dir" "$releases_dir/$release_name"
+staging_dir=""
+
+point_client_at "$release_name"
+
+# --- keep the current and previous clients, so there's always one to roll back to ---
+
+previous=$(cat "$state_dir/previous" 2>/dev/null || true)
+for release_path in "$releases_dir"/*; do
+    [ -d "$release_path" ] || continue
+    name=$(basename "$release_path")
+
+    if [ "$name" != "$release_name" ] && [ "$name" != "$previous" ]; then
+        rm -rf "$release_path"
+        log "removed old client $name"
+    fi
+done
+
+log "installed client $version"

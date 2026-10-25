@@ -16,6 +16,10 @@ apt-get full-upgrade -y
 
 apt-get install -y --no-install-recommends xserver-xorg xinit x11-xserver-utils unclutter chromium
 
+# the client updater downloads with curl and checks signatures with ssh-keygen. both come with the base image, but
+# naming them keeps them if that ever changes
+apt-get install -y --no-install-recommends curl openssh-client
+
 # a system account (uid below 1000): raspberry pi os's first boot setup counts every regular user and
 # falls back to its interactive rename wizard if there's more than the one Imager renames into your admin
 # no password, so it can only be used by the kiosk service on the screen
@@ -597,6 +601,10 @@ CONF
 
 echo "enable pi-tray-admin.service" >> /etc/systemd/system-preset/10-pi-tray.preset
 systemctl enable pi-tray-admin.service
+
+# the client updater, run when the kiosk's page asks after each login. its files are copied in by build-image.sh
+echo "enable pi-tray-update.socket" >> /etc/systemd/system-preset/10-pi-tray.preset
+systemctl enable pi-tray-update.socket
 
 cat > /boot/firmware/admin.example.txt <<'CONF'
 # Optional: admin accounts for SSH and sudo. The touchscreen works without any.

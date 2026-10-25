@@ -57,8 +57,20 @@ mount -t proc proc "$root_mount/proc"
 mount -t sysfs sysfs "$root_mount/sys"
 
 echo "==> Copying in the client"
-mkdir -p "$root_mount/opt/pi-tray/client"
-cp -r "$client_dist_dir/." "$root_mount/opt/pi-tray/client/"
+# the same layout the updater uses: each client in its own release folder, with client a link to the current one
+# 0 as its built_at, so any signed update counts as newer
+mkdir -p "$root_mount/opt/pi-tray/releases/0-image"
+cp -r "$client_dist_dir/." "$root_mount/opt/pi-tray/releases/0-image/"
+ln -sfn releases/0-image "$root_mount/opt/pi-tray/client"
+
+echo "==> Copying in the client updater"
+updater_dir="$script_dir/../updater"
+install -m 755 "$updater_dir/pi-tray-update" "$updater_dir/pi-tray-update-trigger" "$root_mount/usr/local/sbin/"
+install -m 644 "$updater_dir/pi-tray-update.socket" "$updater_dir/pi-tray-update@.service" "$root_mount/etc/systemd/system/"
+
+# the keys pis trust from the start. later ones come from the server, signed by the recovery key
+install -d -m 700 "$root_mount/var/lib/pi-tray-updater"
+install -m 600 "$script_dir/../../../build/keys/allowed_signers" "$root_mount/var/lib/pi-tray-updater/allowed_signers"
 
 echo "==> Configuring inside the image"
 cp "$script_dir/setup.sh" "$root_mount/tmp/setup.sh"

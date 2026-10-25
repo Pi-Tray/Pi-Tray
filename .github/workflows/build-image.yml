@@ -11,6 +11,8 @@ on:
       #- "apps/client/**" dont rebuild every client change or storage and mins quota is swallowed! manually tag image releases when a new client is ready to be included
       # if image build scripts change, rebuild the image to check it still works
       - "apps/image/**"
+      # new images start out trusting the current keys
+      - "build/keys/**"
       - ".github/workflows/build-image.yml"
   # releases made in GitHub's web UI, so their images are built and attached to them
   release:

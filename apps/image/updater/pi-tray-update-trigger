@@ -1,0 +1,38 @@
+#!/bin/bash
+# Run by pi-tray-update.socket for each connection to 127.0.0.1:31416, with the connection as stdin.
+# Any request means "check for a client update now". It runs pi-tray-update, then answers with what happened, so the page
+# knows when to reload without watching for it:
+#   {"installed":true,"release":"<built_at>-<version>"}   a new client is in place
+#   {"installed":false}                                    nothing newer, or another check was already running
+#   {"installed":false,"failed":true}                      the check failed, the journal says why
+# Nothing in the request is used, so a stray or hostile one can at most cause an extra check.
+
+current_link="${PI_TRAY_INSTALL_DIR:-/opt/pi-tray}/client"
+
+# reads up to the end of the headers, so the reply doesn't reset a connection with unread data. capped, so a client that
+# never finishes can't hold this open
+for _ in $(seq 100); do
+    IFS= read -r -t 2 line <&0 || break
+    [ -n "${line%$'\r'}" ] || break
+done
+
+before=$(readlink "$current_link" 2>/dev/null)
+
+# its output goes to stderr, the journal, so nothing it prints can end up in the reply
+/usr/local/sbin/pi-tray-update >&2
+status=$?
+
+after=$(readlink "$current_link" 2>/dev/null)
+
+if [ -n "$after" ] && [ "$after" != "$before" ]; then
+    body="{\"installed\":true,\"release\":\"$(basename "$after")\"}"
+elif [ "$status" -ne 0 ]; then
+    body='{"installed":false,"failed":true}'
+else
+    body='{"installed":false}'
+fi
+
+# the page loads from file://, so its origin is "null" and it needs the allow-origin header to read this.
+# the page may have gone by now, e.g. reloaded, in which case there's no one to tell and that's fine
+printf 'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %s\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n%s' "${#body}" "$body" >&0 2>/dev/null
+exit 0
