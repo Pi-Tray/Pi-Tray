@@ -98,13 +98,15 @@ const PairedDevice = ({device}: {device: PairedDeviceInfo}) => {
                                 {device.last_seen ? `Last seen ${format_date(device.last_seen)} (${last_seen_relative})` : "Never seen"}
                             </span>
                         )}
-                        {device.client_version && (
+                        {device.client_version ? (
                             <span
                                 className={client_outdated ? "text-warning" : undefined}
                                 title={client_outdated ? `This editor is ${editor_version}` : undefined}
                             >
-                                Client {device.client_version}{client_outdated && " (not the latest)"}
+                                Client v{device.client_version}{client_outdated && " (not the latest)"}
                             </span>
+                        ) : (
+                            <span className="opacity-50 italic">Client version unknown</span>
                         )}
                     </div>
 
