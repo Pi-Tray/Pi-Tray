@@ -4,7 +4,7 @@
   "version": "../../../package.json",
   "identifier": "codes.ollieg.pi-tray.editor",
   "build": {
-    "beforeDevCommand": "node ../../scripts/stop-dev-cli.mjs && pnpm run dev:vite",
+    "beforeDevCommand": "node ../../scripts/stop-dev-cli.mjs && node ../../scripts/ensure-client-update-dir.mjs && pnpm run dev:vite",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "pnpm run build && node ../../scripts/ensure-cli-sidecar.mjs && node ../../scripts/pack-client-update.mjs",
     "frontendDist": "../dist"
