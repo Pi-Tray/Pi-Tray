@@ -20,11 +20,27 @@
 !macroend
 
 !macro NSIS_HOOK_POSTINSTALL
+  ; the uninstall an update runs first turns start at login off, and leaves this behind if it was on
+  ${If} ${FileExists} "$APPDATA\pi-tray\autostart-on-reinstall"
+    nsExec::Exec '"$INSTDIR\pi-tray.exe" autostart enable'
+    Pop $0
+    Delete "$APPDATA\pi-tray\autostart-on-reinstall"
+  ${EndIf}
+
   ; starts the supervisor again (or for the first time), which moves itself into the background and starts the server
   Exec '"$INSTDIR\pi-tray.exe" supervise'
 !macroend
 
 !macro NSIS_HOOK_PREUNINSTALL
+  ; updating runs this uninstall before installing the new version, so remember start at login was on for POSTINSTALL.
+  ; a real uninstall leaves the note in the data folder with the rest of the settings, so a reinstall turns it back on
+  ReadRegStr $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "Pi-Tray"
+  ${If} $0 != ""
+    CreateDirectory "$APPDATA\pi-tray"
+    FileOpen $1 "$APPDATA\pi-tray\autostart-on-reinstall" w
+    FileClose $1
+  ${EndIf}
+
   ; done while pi-tray.exe still exists, so the Run key doesn't keep pointing at a missing file after it's removed
   IfFileExists "$INSTDIR\pi-tray.exe" 0 +3
     nsExec::Exec '"$INSTDIR\pi-tray.exe" autostart disable'
