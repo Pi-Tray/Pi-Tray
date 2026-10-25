@@ -76,6 +76,8 @@ grep -qs "/var/log/pi-tray/console.log" "$root_dir/home/pi-tray/.xinitrc" || fai
 [ -x "$root_dir/usr/local/sbin/pi-tray-update" ] || fail "client updater is missing or not executable"
 [ -x "$root_dir/usr/local/sbin/pi-tray-update-trigger" ] || fail "client updater trigger is missing or not executable"
 [ -f "$root_dir/etc/systemd/system/pi-tray-update@.service" ] || fail "client updater service is missing"
+[ -L "$root_dir/etc/systemd/system/multi-user.target.wants/pi-tray-update-verify.service" ] || fail "client update verify isn't enabled"
+grep -qs "pi-tray kiosk starting" "$root_dir/home/pi-tray/.xinitrc" || fail ".xinitrc doesn't mark the kiosk starting for the update verify"
 [ -L "$root_dir/etc/systemd/system/sockets.target.wants/pi-tray-update.socket" ] || fail "client updater socket isn't enabled"
 grep -qs "enable pi-tray-update.socket" "$root_dir/etc/systemd/system-preset/10-pi-tray.preset" || fail "client updater preset is missing"
 head -n 1 "$root_dir/var/lib/pi-tray-updater/allowed_signers" 2>/dev/null | grep -qx "# serial [0-9]*" || fail "the updater's trusted keys are missing"

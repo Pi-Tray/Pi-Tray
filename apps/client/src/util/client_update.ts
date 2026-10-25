@@ -39,6 +39,12 @@ const compatibility_line = (version: string) => {
 
 const version_of_release = (release: string) => release.slice(release.indexOf("-") + 1);
 
+const reload_into_update = () => {
+    // the updater's verify gives the new client a few minutes to log in from here, or puts this one back
+    console.log("pi-tray client reloading into the update");
+    location.reload();
+}
+
 const check_for_update = async () => {
     if (checking || Date.now() - last_check_at < CHECK_COOLDOWN_MS) {
         return;
@@ -65,7 +71,7 @@ const check_for_update = async () => {
         if (compatibility_line(new_version) !== compatibility_line(client_version)) {
             // the server that offered it is newer, and this client may not understand it
             console.log(`Client ${new_version} installed, reloading now as ${client_version} may not work with the server`);
-            location.reload();
+            reload_into_update();
         } else {
             console.log(`Client ${new_version} installed, reloading once nobody has pressed anything for a minute`);
             reload_when_idle = true;
@@ -85,7 +91,7 @@ const check_for_update = async () => {
  */
 export const useClientUpdates = () => {
     const on_ready = useCallback(() => {
-        // the updater's rollback looks for this in the console log, as proof a new client loaded and connected
+        // the updater's verify looks for this in the console log, as proof a new client loaded and logged in
         console.log(`pi-tray client ready ${client_version}`);
         void check_for_update();
     }, []);
@@ -102,8 +108,7 @@ export const useClientUpdates = () => {
 
         const idle_timer = setInterval(() => {
             if (reload_when_idle && Date.now() - last_interaction_at >= IDLE_BEFORE_RELOAD_MS) {
-                console.log("Reloading into the updated client");
-                location.reload();
+                reload_into_update();
             }
         }, IDLE_CHECK_INTERVAL_MS);
 

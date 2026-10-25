@@ -1,0 +1,25 @@
+[Unit]
+Description=Pi-Tray client update verify, rolls back a new client that doesn't start
+# started by pi-tray-update after an install, and again on boot if the pi restarted before the verify finished
+ConditionPathExists=/var/lib/pi-tray-updater/pending
+
+[Service]
+Type=exec
+ExecStart=/usr/local/sbin/pi-tray-update --verify
+
+# root only needs to write the releases and its own state, and restart the kiosk
+ProtectSystem=strict
+ReadWritePaths=/opt/pi-tray /var/lib/pi-tray-updater
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+NoNewPrivileges=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+RestrictSUIDSGID=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

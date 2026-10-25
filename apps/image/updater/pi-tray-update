@@ -3,11 +3,17 @@
 #
 # Usage: pi-tray-update [--force]    check the server and install its client if it's newer
 #        pi-tray-update --rollback   go back to the client that was installed before the current one
+#        pi-tray-update --verify     run by pi-tray-update-verify.service after an install, see below
 #
-# --force installs the server's client even if it isn't newer, for testing. It never skips the signature checks.
+# --force installs the server's client even if it isn't newer, or one that failed to start before, for testing.
+# It never skips the signature checks.
 #
 # Each client lives in /opt/pi-tray/releases/<built_at>-<version>, and /opt/pi-tray/client is a symlink to the current
 # one, which the kiosk opens. The page asks for a check through pi-tray-update-trigger, and reloads itself after one.
+#
+# After an install, pi-tray-update-verify.service watches the kiosk's console log. Once the page reloads, or the kiosk
+# restarts, the new client has a few minutes to log in to the server and log "pi-tray client ready <version>". If it
+# doesn't, the previous client is put back, the kiosk restarted, and that release is never installed again without --force.
 #
 # Trust comes from /var/lib/pi-tray-updater/allowed_signers, in OpenSSH's allowed signers format, starting "# serial N".
 # The server's copy replaces it when the recovery key signed it and its serial is higher, which is how keys are rotated.
@@ -21,15 +27,24 @@ KEYS_NAMESPACE="trusted-keys@pi-tray.ollieg.codes"
 state_dir="${PI_TRAY_UPDATER_STATE_DIR:-/var/lib/pi-tray-updater}"
 install_dir="${PI_TRAY_INSTALL_DIR:-/opt/pi-tray}"
 server_file="${PI_TRAY_SERVER_FILE:-/boot/firmware/pi-tray.txt}"
+console_log="${PI_TRAY_CONSOLE_LOG:-/var/log/pi-tray/console.log}"
+systemctl_command="${PI_TRAY_SYSTEMCTL:-systemctl}"
 
 releases_dir="$install_dir/releases"
 current_link="$install_dir/client"
 trusted_keys="$state_dir/allowed_signers"
 
+# what the verify step is waiting on, and the release that failed it last
+pending_file="$state_dir/pending"
+rejected_file="$state_dir/rejected"
+
 SMALL_FILE_LIMIT=65536
 ARCHIVE_LIMIT=$((64 * 1024 * 1024))
 FETCH_SECONDS=30
 ARCHIVE_FETCH_SECONDS=300
+
+# how long a new client has to log in once it's loaded. generous, as the server has only just been reached
+READY_SECONDS=180
 
 log() {
     echo "pi-tray-update: $*"
@@ -41,12 +56,13 @@ fail() {
 }
 
 force=no
-rollback=no
+mode=update
 for argument in "$@"; do
     case "$argument" in
         --force) force=yes ;;
-        --rollback) rollback=yes ;;
-        *) fail "unknown option $argument, expected --force or --rollback" ;;
+        --rollback) mode=rollback ;;
+        --verify) mode=verify ;;
+        *) fail "unknown option $argument, expected --force, --rollback or --verify" ;;
     esac
 done
 
@@ -57,10 +73,14 @@ if [ -e "$current_link" ] && [ ! -L "$current_link" ]; then
 fi
 mkdir -p "$releases_dir"
 
-# one run at a time, a trigger while one is running has nothing to add
+# one run at a time, a trigger while one is running has nothing to add. that includes a verify, so nothing new is
+# installed while the last install is still being checked.
+# verify waits instead, as it's started by the install that's still holding the lock
 exec 9> "$state_dir/lock"
-if ! flock -n 9; then
-    log "another update check is already running"
+if [ "$mode" = verify ]; then
+    flock 9
+elif ! flock -n 9; then
+    log "another update check is already running, or the last install is still being verified"
     exit 0
 fi
 
@@ -92,14 +112,115 @@ point_client_at() {
     log "client is now $release_name"
 }
 
-if [ "$rollback" = yes ]; then
+if [ "$mode" = rollback ]; then
     previous=$(cat "$state_dir/previous" 2>/dev/null || true)
     if [ -z "$previous" ] || [ ! -d "$releases_dir/$previous" ]; then
         fail "there's no previous client to go back to"
     fi
 
+    # a manual rollback means whatever was being verified is no longer installed
+    rm -f "$pending_file"
     point_client_at "$previous"
     exit 0
+fi
+
+# --- verify: did the new client start? ---
+
+if [ "$mode" = verify ]; then
+    if [ ! -f "$pending_file" ]; then
+        log "no install is waiting to be verified"
+        exit 0
+    fi
+
+    # written by the install as: release, release it replaced, console log inode, console log size at the time
+    mapfile -t pending_fields < "$pending_file"
+    if [ "${#pending_fields[@]}" -ne 4 ] || [[ ! "${pending_fields[3]}" =~ ^[0-9]+$ ]]; then
+        log "the pending install record is damaged, so it can't be verified"
+        rm -f "$pending_file"
+        exit 0
+    fi
+
+    pending_release="${pending_fields[0]}"
+    pending_previous="${pending_fields[1]}"
+    log_inode="${pending_fields[2]}"
+    log_offset="${pending_fields[3]}"
+
+    if [ "$(current_release)" != "$pending_release" ]; then
+        log "$pending_release is no longer the installed client, nothing to verify"
+        rm -f "$pending_file"
+        exit 0
+    fi
+
+    pending_version="${pending_release#*-}"
+    # chromium quotes the message, so 0.3.0 can't match 0.3.0-beta.1
+    ready_line="\"pi-tray client ready $pending_version\""
+    deadline=""
+
+    # byte offsets, not characters
+    export LC_ALL=C
+
+    log "waiting for the kiosk to load $pending_release"
+
+    while :; do
+        current_inode=$(stat -c %i "$console_log" 2>/dev/null || echo none)
+        current_size=$(stat -c %s "$console_log" 2>/dev/null || echo 0)
+
+        # .xinitrc moves the log aside when it gets big, so start the new one from the top
+        if [ "$current_inode" != "$log_inode" ] || [ "$current_size" -lt "$log_offset" ]; then
+            log_inode="$current_inode"
+            log_offset=0
+        fi
+
+        if [ "$current_size" -gt "$log_offset" ]; then
+            new_text=$(tail -c +"$((log_offset + 1))" "$console_log" | head -c "$((current_size - log_offset))"; echo x)
+            new_text="${new_text%x}"
+
+            # only whole lines, the rest is read next time once it's finished
+            if [[ "$new_text" == *$'\n'* ]]; then
+                whole_lines="${new_text%$'\n'*}"$'\n'
+                log_offset=$((log_offset + ${#whole_lines}))
+
+                if [ -z "$deadline" ] && grep -qF -e "pi-tray client reloading" -e "pi-tray kiosk starting" <<< "$whole_lines"; then
+                    deadline=$(($(date +%s) + READY_SECONDS))
+                    log "the kiosk is loading $pending_release, it has $READY_SECONDS seconds to log in"
+                fi
+
+                # only counts once loading started, as a line from before the reload came from the previous client
+                if [ -n "$deadline" ] && grep -qF -e "$ready_line" <<< "$whole_lines"; then
+                    log "$pending_release started and logged in"
+                    rm -f "$pending_file"
+                    if [ "$(cat "$rejected_file" 2>/dev/null)" = "$pending_release" ]; then
+                        rm -f "$rejected_file"
+                    fi
+                    exit 0
+                fi
+            fi
+        fi
+
+        if [ -n "$deadline" ] && [ "$(date +%s)" -ge "$deadline" ]; then
+            break
+        fi
+
+        sleep 1
+    done
+
+    log "$pending_release didn't log in within $READY_SECONDS seconds, going back to $pending_previous"
+
+    echo "$pending_release" > "$rejected_file"
+    rm -f "$pending_file"
+
+    if [ -n "$pending_previous" ] && [ -d "$releases_dir/$pending_previous" ]; then
+        point_client_at "$pending_previous"
+    else
+        fail "$pending_previous isn't there to go back to, so the kiosk stays on $pending_release"
+    fi
+
+    # the broken client is gone, so a manual --rollback can't land on it
+    rm -rf "${releases_dir:?}/$pending_release"
+    rm -f "$state_dir/previous"
+
+    "$systemctl_command" restart pi-tray-kiosk.service || log "couldn't restart the kiosk, it'll load $pending_previous next time it starts"
+    exit 1
 fi
 
 # --- where the server is ---
@@ -221,6 +342,11 @@ if [ "$force" = no ] && [ "$built_at" -le "$(built_at_of "$current")" ]; then
     exit 0
 fi
 
+if [ "$force" = no ] && [ "$(cat "$rejected_file" 2>/dev/null)" = "$release_name" ]; then
+    log "$release_name failed to start last time, so it won't be installed again until the server offers a newer one"
+    exit 0
+fi
+
 # --- the archive: exactly what the manifest says, holding only files and folders ---
 
 fetch client.tgz "$ARCHIVE_LIMIT" "$ARCHIVE_FETCH_SECONDS" || fail "couldn't download client.tgz"
@@ -251,6 +377,14 @@ rm -rf "${releases_dir:?}/$release_name"
 mv -T "$staging_dir" "$releases_dir/$release_name"
 staging_dir=""
 
+# recorded before the swap, so the verify can't miss the page reloading however quickly it happens
+{
+    echo "$release_name"
+    current_release
+    stat -c %i "$console_log" 2>/dev/null || echo none
+    stat -c %s "$console_log" 2>/dev/null || echo 0
+} > "$pending_file"
+
 point_client_at "$release_name"
 
 # --- keep the current and previous clients, so there's always one to roll back to ---
@@ -267,3 +401,6 @@ for release_path in "$releases_dir"/*; do
 done
 
 log "installed client $version"
+
+# waits for this run to finish, as it needs the lock
+"$systemctl_command" start --no-block pi-tray-update-verify.service || log "couldn't start the verify, so $release_name won't be rolled back if it fails to start"

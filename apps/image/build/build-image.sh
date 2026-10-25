@@ -66,7 +66,7 @@ ln -sfn releases/0-image "$root_mount/opt/pi-tray/client"
 echo "==> Copying in the client updater"
 updater_dir="$script_dir/../updater"
 install -m 755 "$updater_dir/pi-tray-update" "$updater_dir/pi-tray-update-trigger" "$root_mount/usr/local/sbin/"
-install -m 644 "$updater_dir/pi-tray-update.socket" "$updater_dir/pi-tray-update@.service" "$root_mount/etc/systemd/system/"
+install -m 644 "$updater_dir/pi-tray-update.socket" "$updater_dir/pi-tray-update@.service" "$updater_dir/pi-tray-update-verify.service" "$root_mount/etc/systemd/system/"
 
 # the keys pis trust from the start. later ones come from the server, signed by the recovery key
 install -d -m 700 "$root_mount/var/lib/pi-tray-updater"

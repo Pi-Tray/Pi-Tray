@@ -606,6 +606,10 @@ systemctl enable pi-tray-admin.service
 echo "enable pi-tray-update.socket" >> /etc/systemd/system-preset/10-pi-tray.preset
 systemctl enable pi-tray-update.socket
 
+# enabled so a verify interrupted by a reboot carries on, it does nothing unless an install is waiting on it
+echo "enable pi-tray-update-verify.service" >> /etc/systemd/system-preset/10-pi-tray.preset
+systemctl enable pi-tray-update-verify.service
+
 cat > /boot/firmware/admin.example.txt <<'CONF'
 # Optional: admin accounts for SSH and sudo. The touchscreen works without any.
 #
@@ -665,6 +669,9 @@ console_log=/var/log/pi-tray/console.log
 if [ "$(stat -c %s "$console_log" 2>/dev/null || echo 0)" -gt 5000000 ]; then
     mv "$console_log" "$console_log.1"
 fi
+
+# tells the client updater's verify that whatever client is installed is about to load
+echo "pi-tray kiosk starting" >> "$console_log"
 
 chromium \
     --kiosk \
