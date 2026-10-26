@@ -134,19 +134,32 @@ jobs:
         id: tauri-build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # signs the client update bundled into the app, see scripts/pack-client-update.mjs
           CLIENT_SIGNING_KEY: ${{ secrets.CLIENT_SIGNING_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: apps/editor
           tauriScript: pnpm tauri
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ github.ref_type == 'tag' && '--config src-tauri/tauri.updater.conf.json' || '' }}
 
       - name: Prepare artifact paths
         id: prep_paths
         shell: bash
         run: |
+          # both macos builds name their update archive Pi-Tray.app.tar.gz, so it gets the architecture added
+          arch="${{ contains(matrix.args, 'aarch64') && 'aarch64' || 'x64' }}"
+
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
-          echo '${{ steps.tauri-build.outputs.artifactPaths }}' | jq -r .[] >> "$GITHUB_OUTPUT"
+          echo '${{ steps.tauri-build.outputs.artifactPaths }}' | jq -r '.[]' | while IFS= read -r artifact; do
+            case "$artifact" in
+              *.app.tar.gz|*.app.tar.gz.sig)
+                renamed="$(dirname "$artifact")/$(basename "$artifact" | sed "s/\.app\.tar\.gz/_${arch}.app.tar.gz/")"
+                mv "$artifact" "$renamed"
+                artifact="$renamed"
+                ;;
+            esac
+            echo "$artifact"
+          done >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       # Always upload files to a temporary workflow-run bridge so they can be collected later.
@@ -202,7 +215,7 @@ jobs:
           release_tag="${{ needs.check.outputs.release_tag }}"
 
           # the artifacts keep each bundle type in its own folder, and macos also includes the .app folder itself
-          mapfile -t assets < <(find dist-bins -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' -o -name '*.msi' \))
+          mapfile -t assets < <(find dist-bins -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' -o -name '*.msi' -o -name '*.app.tar.gz' -o -name '*.sig' \))
           printf 'Uploading %s\n' "${assets[@]}"
 
           if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
@@ -210,8 +223,9 @@ jobs:
           else
             gh release create "$release_tag" "${assets[@]}" --repo "${{ github.repository }}" --title "$release_tag" --generate-notes --latest=false
           fi
-
+          
       - name: Update the rolling editor-latest release
+        if: ${{ !contains(needs.check.outputs.release_tag, '-') }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -221,6 +235,39 @@ jobs:
               --latest=false
           fi
           # the artifacts keep each bundle type in its own folder, and macos also includes the .app folder itself
-          mapfile -t assets < <(find dist-bins -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' -o -name '*.msi' \))
+          mapfile -t assets < <(find dist-bins -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' -o -name '*.msi' -o -name '*.app.tar.gz' -o -name '*.sig' \))
           printf 'Uploading %s\n' "${assets[@]}"
           gh release upload editor-latest "${assets[@]}" --repo "${{ github.repository }}" --clobber
+
+      # after editor-latest exists, as the installed apps check for updates there
+      - name: Publish the update manifest
+        if: ${{ !contains(needs.check.outputs.release_tag, '-') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_tag="${{ needs.check.outputs.release_tag }}"
+          base_url="https://github.com/${{ github.repository }}/releases/download/$release_tag"
+          platforms='{}'
+
+          while IFS= read -r signature_path; do
+            asset="$(basename "${signature_path%.sig}")"
+            case "$asset" in
+              *-setup.exe) key=windows-x86_64-nsis ;;
+              *.msi) key=windows-x86_64-msi ;;
+              *_amd64.AppImage) key=linux-x86_64-appimage ;;
+              *_amd64.deb) key=linux-x86_64-deb ;;
+              *.x86_64.rpm) key=linux-x86_64-rpm ;;
+              *_aarch64.app.tar.gz) key=darwin-aarch64-app ;;
+              *_x64.app.tar.gz) key=darwin-x86_64-app ;;
+              *) continue ;;
+            esac
+            platforms=$(jq --arg key "$key" --arg url "$base_url/$asset" --rawfile signature "$signature_path" \
+              '. + {($key): {url: $url, signature: ($signature | rtrimstr("\n"))}}' <<< "$platforms")
+          done < <(find dist-bins -type f -name '*.sig')
+
+          jq -n --arg version "${release_tag#v}" --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --argjson platforms "$platforms" \
+            '{version: $version, pub_date: $date, notes: "", platforms: $platforms}' > latest.json
+          cat latest.json
+
+          gh release upload "$release_tag" latest.json --repo "${{ github.repository }}" --clobber
+          gh release upload editor-latest latest.json --repo "${{ github.repository }}" --clobber

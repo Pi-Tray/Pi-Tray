@@ -37,7 +37,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/pi-tray"],
+    "externalBin": [
+      "binaries/pi-tray"
+    ],
     "resources": {
       "client-update/": "client-update/"
     },
@@ -50,8 +52,15 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["pi-tray-editor"]
+        "schemes": [
+          "pi-tray-editor"
+        ]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ1QTNDNDAyRkUxRDQ1MjkKUldRcFJSMytBc1NqMWJjV1NIMmNTd2NpMFp5Ni9KcmhaYWFLUmd3NXFGd3dON2FCYzRwQVA0VXAK",
+      "endpoints": ["https://github.com/Pi-Tray/Pi-Tray/releases/download/editor-latest/latest.json"],
+      "requireSignedVersion": true
     }
   }
 }
