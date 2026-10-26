@@ -1,8 +1,10 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {ConfigKey, useConfigValue} from "../util/config";
 import {Link} from "wouter";
-import {Server} from "lucide-react";
+import {RefreshCw, Server} from "lucide-react";
 import {editor_version} from "../version.ts";
+import {updates_supported, useUpdates} from "../contexts/UpdateProvider.tsx";
+import {open_release_notes, UpdateProgress} from "../components/UpdateToast.tsx";
 
 interface BaseSettingProps {
     label: string;
@@ -146,6 +148,52 @@ const TextSetting = ({label, config_key, tooltip, placeholder,  button_text = "A
     );
 }
 
+/**
+ * The editor's version, and checking for and installing a newer one.
+ */
+const UpdateSection = () => {
+    const {state, available_version, check, install} = useUpdates();
+
+    const busy = state.kind === "checking" || state.kind === "downloading" || state.kind === "installing";
+    const can_install = available_version !== null && !busy;
+
+    return (
+        <div className="flex flex-col gap-2 items-start">
+            <p className="text-gray-500 tracking-wide font-light text-xs">Pi-Tray v{editor_version}</p>
+
+            {!updates_supported ? (
+                <span className="text-sm text-base-content/60">Dev builds don't check for updates</span>
+            ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                    <button className="btn btn-sm" onClick={check} disabled={busy}>
+                        <RefreshCw className={`w-4 h-4 ${state.kind === "checking" ? "animate-spin" : ""}`}/>
+                        Check for updates
+                    </button>
+
+                    {can_install && (
+                        <>
+                            <button className="btn btn-sm btn-primary" onClick={install}>
+                                Update to {available_version}
+                            </button>
+                            <button className="btn btn-sm btn-link px-1" onClick={() => open_release_notes(available_version)}>
+                                What's new
+                            </button>
+                        </>
+                    )}
+
+                    {state.kind === "up_to_date" && <span className="text-sm text-base-content/60">Up to date</span>}
+                </div>
+            )}
+
+            {state.kind === "error" && <span className="text-sm text-error">{state.message}</span>}
+
+            <div className="w-80">
+                <UpdateProgress state={state}/>
+            </div>
+        </div>
+    );
+}
+
 export const SettingsPage = () => {
     const [ws_url_overridden] = useConfigValue("dont_overwrite_ws_url");
     const ws_url_locked = !ws_url_overridden;
@@ -210,7 +258,7 @@ export const SettingsPage = () => {
                 </Link>
             </div>
 
-            <p className="text-gray-500 tracking-wide font-light text-xs">Pi-Tray v{editor_version}</p>
+            <UpdateSection />
         </div>
     );
 }

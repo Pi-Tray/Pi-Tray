@@ -4,6 +4,7 @@ import {usePathname} from "wouter/use-browser-location";
 import {Code, Images, LayoutGrid, Server, Settings, Tablet, ToyBrick} from "lucide-react";
 import {motion, AnimatePresence} from "motion/react";
 import {useConfigValue} from "../util/config";
+import {useUpdates} from "../contexts/UpdateProvider";
 
 interface LeftNavItemProps {
     icon: React.ReactNode;
@@ -14,6 +15,9 @@ interface LeftNavItemProps {
     link_className?: string;
 
     mark_if_nested?: boolean;
+
+    /** Shows a dot on the icon, e.g. for something waiting on that page */
+    badge?: boolean;
 }
 
 /**
@@ -24,9 +28,10 @@ interface LeftNavItemProps {
  * @param className additional class names for the list item
  * @param link_className additional class names for the link
  * @param mark_if_nested whether to mark the nav item if the pathname is a nested path of the href, e.g. `/foo/bar` for `href="/foo"` (default: false)
+ * @param badge whether to show a dot on the icon (default: false)
  * @returns the element
  */
-const LeftNavItem = ({href, title, icon, className = "", link_className = "", mark_if_nested = false}: LeftNavItemProps) => {
+const LeftNavItem = ({href, title, icon, className = "", link_className = "", mark_if_nested = false, badge = false}: LeftNavItemProps) => {
     const pathname = usePathname();
 
     let is_active = pathname === href;
@@ -45,7 +50,10 @@ const LeftNavItem = ({href, title, icon, className = "", link_className = "", ma
                 }
             </AnimatePresence>
             <Link href={href} className={`tooltip tooltip-right ${link_className}`} data-tip={title}>
-                {icon}
+                <span className="relative">
+                    {icon}
+                    {badge && <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-primary pointer-events-none"/>}
+                </span>
             </Link>
         </li>
     );
@@ -53,6 +61,7 @@ const LeftNavItem = ({href, title, icon, className = "", link_className = "", ma
 
 export const LeftNav = () => {
     const [show_devtools] = useConfigValue("devtools");
+    const {available_version} = useUpdates();
 
     return (
       <ul className="menu h-full bg-base-300">
@@ -71,7 +80,12 @@ export const LeftNav = () => {
               </AnimatePresence>
 
               <LeftNavItem href="/server" title="Server" icon={<Server />} />
-              <LeftNavItem href="/settings" title="Settings" icon={<Settings />} />
+              <LeftNavItem
+                  href="/settings"
+                  title={available_version ? `Settings (Pi-Tray ${available_version} is available)` : "Settings"}
+                  icon={<Settings />}
+                  badge={available_version !== null}
+              />
           </div>
       </ul>
     );
