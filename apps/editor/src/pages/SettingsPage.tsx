@@ -159,12 +159,12 @@ const UpdateSection = () => {
 
     return (
         <div className="flex flex-col gap-2 items-start">
-            <p className="text-gray-500 tracking-wide font-light text-xs">Pi-Tray v{editor_version}</p>
-
             {!updates_supported ? (
-                <span className="text-sm text-base-content/60">Dev builds don't check for updates</span>
+                <p className="text-gray-500 tracking-wide font-light text-xs">Pi-Tray v{editor_version}</p>
             ) : (
                 <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-gray-500 tracking-wide font-light text-xs">Pi-Tray v{editor_version}</p>
+
                     <button className="btn btn-sm" onClick={check} disabled={busy}>
                         <RefreshCw className={`w-4 h-4 ${state.kind === "checking" ? "animate-spin" : ""}`}/>
                         Check for updates
