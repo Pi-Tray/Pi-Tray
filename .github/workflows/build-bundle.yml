@@ -217,11 +217,28 @@ jobs:
           # the artifacts keep each bundle type in its own folder, and macos also includes the .app folder itself
           mapfile -t assets < <(find dist-bins -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.dmg' -o -name '*-setup.exe' -o -name '*.msi' -o -name '*.app.tar.gz' -o -name '*.sig' \))
           printf 'Uploading %s\n' "${assets[@]}"
-
+          
+          # a stable release is what the repo's front page should send people to. image and plugin releases never are
+          if [[ "$release_tag" == *-* ]]; then
+            release_flags=(--prerelease --latest=false)
+          else
+            release_flags=(--latest)
+          fi
+          
+          # github's generated changelog first, with a pointer to the pi image after it
+          gh api "repos/${{ github.repository }}/releases/generate-notes" -f tag_name="$release_tag" --jq .body > release-notes.md
+          cat >> release-notes.md <<EOF
+          
+          ---
+          Setting up a new Raspberry Pi? Get the image from the [image releases](https://github.com/${{ github.repository }}/releases?q=image-&expanded=true). Pis already set up update themselves.
+          EOF
+            
           if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then
             gh release upload "$release_tag" "${assets[@]}" --repo "${{ github.repository }}" --clobber
+            gh release edit "$release_tag" "${release_flags[@]}" --repo "${{ github.repository }}"
           else
-            gh release create "$release_tag" "${assets[@]}" --repo "${{ github.repository }}" --title "$release_tag" --generate-notes --latest=false
+            gh release create "$release_tag" "${assets[@]}" --repo "${{ github.repository }}" --title "$release_tag" \
+           --notes-file release-notes.md "${release_flags[@]}"
           fi
           
       - name: Update the rolling editor-latest release
