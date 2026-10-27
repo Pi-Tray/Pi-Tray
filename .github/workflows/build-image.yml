@@ -140,7 +140,18 @@ jobs:
 
       # uses the exact image the check saw, in case a new one is released mid-run
       - name: Build the image
-        run: sudo bash ./apps/image/build/build-image.sh apps/client/dist out "${{ needs.check.outputs.base_image_url }}"
+        run: |
+          # scheduled builds rebuild the latest image tag, everything else builds the tag or commit that triggered it
+          source_ref="${{ needs.check.outputs.source_ref || needs.check.outputs.release_tag }}"
+          case "$source_ref" in
+            image-v*) image_version="v${source_ref#image-v}" ;;
+            *) image_version="dev-${GITHUB_SHA::7}" ;;
+          esac
+
+          base_image_url="${{ needs.check.outputs.base_image_url }}"
+          base_image_name="$(basename "$base_image_url" .img.xz)"
+
+          sudo PI_TRAY_IMAGE_NAME="pi-tray-$image_version-$base_image_name" bash ./apps/image/build/build-image.sh apps/client/dist out "$base_image_url"
 
       - name: Point the Imager list at this release
         if: needs.check.outputs.should_publish == 'true'

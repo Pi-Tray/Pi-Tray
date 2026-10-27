@@ -101,7 +101,10 @@ losetup -d "$loop_device"
 loop_device=""
 
 echo "==> Compressing"
-image_name="pi-tray-$(date +%Y-%m-%d).img"
+
+# CI names it after the image's version and the os it's built on, a local build is just dated
+image_name="${PI_TRAY_IMAGE_NAME:-pi-tray-$(date +%Y-%m-%d)}.img"
+
 mv "$image_path" "$output_dir/$image_name"
 extract_size=$(stat --format=%s "$output_dir/$image_name")
 extract_sha256=$(sha256sum "$output_dir/$image_name" | cut -d " " -f 1)
