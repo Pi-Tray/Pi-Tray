@@ -35,7 +35,7 @@ const asset_id_from_url = (url: string | null): string | null => {
 }
 
 const handle_message = (message: ServerMessage) => {
-    if (message.action !== "set_cells" || !Array.isArray(message.payload)) {
+    if (message.action !== "update_cells" || !Array.isArray(message.payload)) {
         return;
     }
 

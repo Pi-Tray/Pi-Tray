@@ -113,7 +113,7 @@ export const PushButtonGrid = ({rows, cols, className, button_className, request
     const handle_message = useCallback(
         (message: ServerMessage) => {
             switch (message.action) {
-                case "set_cells":
+                case "update_cells":
                     // may only hold the cells that changed, so the rest keep their last value
                     setCells((previous) => {
                         const next = new Map(previous);

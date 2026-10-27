@@ -41,7 +41,7 @@ const useAssetUrl = (asset_path: string | null) => {
                     return;
                 }
 
-                // null is a missing or replaced asset, and a replaced one's new path follows in a set_cells
+                // null is a missing or replaced asset, and a replaced one's new path follows in an update_cells
                 shown_path.current = image ? asset_path : null;
                 setObjectURL(image ? URL.createObjectURL(image) : "");
             })

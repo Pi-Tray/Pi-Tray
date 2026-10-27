@@ -33,23 +33,44 @@ export interface PluginConfigReference {
  */
 export type PluginReference = string | PluginConfigReference;
 
+export type CellAction =
+    | {kind: "plugin", plugin: PluginReference}
+    | {kind: "page", id: string}
+    | {kind: "back"}
+    | {kind: "home"};
+
 /**
  * The data structure for a cell in the grid.<br>
  * This is loaded from the data directory, specifically from the `rows` directory.
  * @param text the text to display in the cell (default: empty string)
  * @param text_is_icon whether the text should be treated as a Lucide icon name (default: false)
- * @param plugin the name of the plugin that runs when the cell is clicked, or a configuration object for the plugin (default: no plugin)
+ * @param action the action to perform when the cell is pushed (default: none)
  * @param background relative asset URL for the background image to use for the cell (default: no background)
  */
 export interface CellData {
     text?: string;
     text_is_icon?: boolean;
 
-    plugin?: PluginReference;
+    action?: CellAction;
 
     background?: string;
 }
 
+export interface PageData {
+    row_data: CellData[][];
+}
+
+export interface GridShape {
+    rows: number;
+    cols: number;
+}
+
+export interface PageManifest {
+    home: string; // uuid
+    order: string[]; // uuid[]
+    names: { [uuid: string]: string }; // uuid -> name
+    shape: GridShape; // all pages have same shape for now
+}
 
 /**
  * The parts of a client's connection a plugin can use.<br>

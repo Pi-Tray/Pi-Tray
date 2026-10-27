@@ -65,7 +65,7 @@ export const register_notifiers = (client: Client): (() => void) => {
         pending_cells.clear();
 
         if (payloads.length > 0) {
-            send_message(client, {action: "set_cells", payload: payloads});
+            send_message(client, {action: "update_cells", payload: payloads});
         }
     }
 
@@ -89,7 +89,7 @@ export const register_notifiers = (client: Client): (() => void) => {
             last_sent.set(cell_key(payload.y, payload.x), JSON.stringify(payload));
         }
 
-        send_message(client, {action: "set_cells", payload: payloads});
+        send_message(client, {action: "update_cells", payload: payloads});
     }
 
     const grid_changed: GridChangeListener = async (changes) => {
