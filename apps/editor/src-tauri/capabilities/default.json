@@ -23,6 +23,9 @@
       "identifier": "fs:read-all",
       "allow": [
         {
+          "path": "$DATA/pi-tray"
+        },
+        {
           "path": "$DATA/pi-tray/**/*"
         }
       ]

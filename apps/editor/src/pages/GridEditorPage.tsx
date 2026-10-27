@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 
-import {delete_grid_cell, useGridCell, useGridShape} from "../util/grid";
+import {delete_grid_cell, useGridCell, useGridShape, usePageManifest} from "../util/pages";
+import {EditingPageContext, useEditingPage} from "../contexts/EditingPageContext.tsx";
 import {unwrap_plugin_reference, usePluginInfo} from "../util/plugins";
 import {PushButtonGrid} from "../components/PushButtonGrid";
 
@@ -188,9 +189,10 @@ const ControlledHint = ({prop}: {prop: string}) => (
 );
 
 const SidebarContent = ({coords}: SidebarContentProps) => {
-    const [cell, setCellData] = useGridCell(coords.y, coords.x);
+    const page_id = useEditingPage();
+    const [cell, setCellData] = useGridCell(page_id, coords.y, coords.x);
 
-    const plugin = cell && (cell.plugin ? unwrap_plugin_reference(cell.plugin) : null);
+    const plugin = cell?.action?.kind === "plugin" ? unwrap_plugin_reference(cell.action.plugin) : null;
     const [config_edit_open, setConfigEditOpen] = useState(false);
 
     const [background_picker_open, setBackgroundPickerOpen] = useState(false);
@@ -236,9 +238,9 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
                 return;
             }
 
-            delete_grid_cell(coords.y, coords.x);
+            delete_grid_cell(page_id, coords.y, coords.x);
         },
-        [cell, coords]
+        [cell, page_id, coords]
     );
 
     // only offer configuration for plugins that declare settings
@@ -330,16 +332,13 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
                         // remove plugin
                         setCellData({
                             ...cell,
-                            plugin: undefined
+                            action: undefined
                         });
                     } else {
                         // set new plugin, with no config
                         setCellData({
                             ...cell,
-                            plugin: {
-                                name: new_plugin_name,
-                                config: undefined
-                            }
+                            action: {kind: "plugin", plugin: {name: new_plugin_name, config: undefined}}
                         });
                     }
                 }} />
@@ -401,6 +400,9 @@ export const GridEditorPage = () => {
 
     const [shape, setGridShape] = useGridShape();
 
+    // TODO: the page picked in the page switcher
+    const page_id = usePageManifest().home;
+
     // when a button is selected, the sidebar will be open
     const [selected_button, setSelectedButton] = useState<{x: number, y: number} | null>(null);
 
@@ -420,51 +422,53 @@ export const GridEditorPage = () => {
 
 
     return (
-        <div className="flex h-full max-h-full w-full max-w-full flex-1">
-            <div className={`flex-1 flex flex-col h-full max-h-full max-w-full gap-4 ${selected_button ? "w-25 mr-79" : "w-full mr-0"}`}>
-                <h1 className="text-2xl font-bold">Edit grid</h1>
+        <EditingPageContext.Provider value={page_id}>
+            <div className="flex h-full max-h-full w-full max-w-full flex-1">
+                <div className={`flex-1 flex flex-col h-full max-h-full max-w-full gap-4 ${selected_button ? "w-25 mr-79" : "w-full mr-0"}`}>
+                    <h1 className="text-2xl font-bold">Edit grid</h1>
 
-                <div className="flex-1">
-                    <PushButtonGrid rows={shape.rows} cols={shape.cols} on_click={button_clicked} highlight={selected_button} />
+                    <div className="flex-1">
+                        <PushButtonGrid rows={shape.rows} cols={shape.cols} on_click={button_clicked} highlight={selected_button} />
+                    </div>
+
+                    <label className="flex items-center gap-2 mt-2">
+                        Grid size:
+
+                        <input
+                            type="number"
+                            className="input input-sm input-bordered w-15"
+                            value={shape.cols}
+                            onChange={e => setGridShape({rows: shape.rows, cols: Math.max(1, Math.min(20, Number(e.target.value)))})}
+                            min={1}
+                            max={20}
+                        />
+                        x
+                        <input
+                            type="number"
+                            className="input input-sm input-bordered w-15"
+                            value={shape.rows}
+                            onChange={e => setGridShape({rows: Math.max(1, Math.min(20, Number(e.target.value))), cols: shape.cols})}
+                            min={1}
+                            max={20}
+                        />
+
+                        ({shape.cols * shape.rows} buttons)
+                    </label>
                 </div>
 
-                <label className="flex items-center gap-2 mt-2">
-                    Grid size:
+                <aside className={`h-full flex flex-col fixed top-0 right-0 w-75 overflow-y-auto bg-base-200 border-l border-l-base-300 p-4 transition-transform ${!selected_button && "translate-x-full"}`}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-semibold">Configure cell</h3>
 
-                    <input
-                        type="number"
-                        className="input input-sm input-bordered w-15"
-                        value={shape.cols}
-                        onChange={e => setGridShape({rows: shape.rows, cols: Math.max(1, Math.min(20, Number(e.target.value)))})}
-                        min={1}
-                        max={20}
-                    />
-                    x
-                    <input
-                        type="number"
-                        className="input input-sm input-bordered w-15"
-                        value={shape.rows}
-                        onChange={e => setGridShape({rows: Math.max(1, Math.min(20, Number(e.target.value))), cols: shape.cols})}
-                        min={1}
-                        max={20}
-                    />
+                        <button title="Close configure cell sidebar" onClick={close_sidebar} className="cursor-pointer">
+                            <X />
+                        </button>
+                    </div>
 
-                    ({shape.cols * shape.rows} buttons)
-                </label>
+                    {selected_button && <SidebarContent coords={selected_button} />}
+                </aside>
             </div>
-
-            <aside className={`h-full flex flex-col fixed top-0 right-0 w-75 overflow-y-auto bg-base-200 border-l border-l-base-300 p-4 transition-transform ${!selected_button && "translate-x-full"}`}>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold">Configure cell</h3>
-
-                    <button title="Close configure cell sidebar" onClick={close_sidebar} className="cursor-pointer">
-                        <X />
-                    </button>
-                </div>
-
-                {selected_button && <SidebarContent coords={selected_button} />}
-            </aside>
-        </div>
+        </EditingPageContext.Provider>
     );
 }
 

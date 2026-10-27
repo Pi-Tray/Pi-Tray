@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {useMediaQuery} from "../hooks/useMediaQuery.ts";
-import {useGridCell} from "../util/grid.ts";
+import {useGridCell} from "../util/pages.ts";
+import {useEditingPage} from "../contexts/EditingPageContext.tsx";
 import {unwrap_plugin_reference, usePluginInfo} from "../util/plugins.ts";
 import {find_missing_required, PluginConfigForm} from "./PluginConfigForm.tsx";
 import {X} from "lucide-react";
@@ -18,12 +19,12 @@ export const ConfigEditDialog = ({
     const dialog_ref = useRef<HTMLDialogElement>(null);
     const dark_mode = useMediaQuery("(prefers-color-scheme: dark)");
 
-    const [cell, setCellData] = useGridCell(coords.y, coords.x);
+    const [cell, setCellData] = useGridCell(useEditingPage(), coords.y, coords.x);
 
-    const plugin = cell && (cell.plugin ? unwrap_plugin_reference(cell.plugin) : null);
+    const plugin = cell?.action?.kind === "plugin" ? unwrap_plugin_reference(cell.action.plugin) : null;
     const plugin_info = usePluginInfo(plugin ? plugin.name : null);
 
-    // edits are drafted here and only written to grid.json on save, so typing doesn't rewrite the file on every keystroke
+    // edits are drafted here and only written to the page on save, so typing doesn't rewrite the file on every keystroke
     const [draft_config, setDraftConfig] = useState<{ [key: string]: any }>({});
     const [show_raw_json, setShowRawJson] = useState(false);
 
@@ -58,16 +59,16 @@ export const ConfigEditDialog = ({
 
     const save = useCallback(
         () => {
-            if (!cell || !cell.plugin) {
+            if (!cell || cell.action?.kind !== "plugin") {
                 return;
             }
 
-            const new_plugin = unwrap_plugin_reference(cell.plugin);
+            const new_plugin = unwrap_plugin_reference(cell.action.plugin);
             new_plugin.config = draft_config;
 
             setCellData({
                 ...cell,
-                plugin: new_plugin
+                action: {kind: "plugin", plugin: new_plugin}
             });
 
             onClose();

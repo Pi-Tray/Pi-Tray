@@ -1,20 +1,26 @@
-import type {CellData, CellPayload} from "./types";
+import type {CellData, CellPayload, PageCells} from "./types";
 import {unwrap_plugin_reference} from "./types";
 
 import {resolve_asset_url} from "./assets";
 import {get_live_state} from "./live/state";
 import {load_plugin} from "./plugins";
-import {PageData} from "./pages";
 
 /**
  * Whether pressing a cell does anything, so clients can skip press feedback for cells that don't.
  */
 const is_pushable = (cell: CellData | undefined): boolean => {
-    if (!cell?.plugin) {
+    const action = cell?.action;
+
+    if (!action) {
         return false;
     }
 
-    const plugin_name = unwrap_plugin_reference(cell.plugin).name;
+    // links always do something, they change page
+    if (action.kind !== "plugin") {
+        return true;
+    }
+
+    const plugin_name = unwrap_plugin_reference(action.plugin).name;
 
     try {
         return typeof load_plugin(plugin_name).handle_push === "function";
@@ -52,7 +58,7 @@ export const build_cell_payload = (col_idx: number, row_idx: number, cell: CellD
  * Builds the payload for every filled cell in the grid, for sending the whole grid in one set_cells.
  * @param grid the grid to build payloads for
  */
-export const build_grid_payload = (grid: GridData): CellPayload[] => {
+export const build_grid_payload = (grid: PageCells): CellPayload[] => {
     const payloads: CellPayload[] = [];
 
     for (const [row_key, row] of Object.entries(grid)) {

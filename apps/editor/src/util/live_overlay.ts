@@ -129,7 +129,7 @@ export const useLiveCell = (row_idx: number, col_idx: number, plugin_name: strin
 
 /**
  * Overlays live values onto a cell's stored data, but only for the fields its plugin controls.<br>
- * Everything else comes from grid.json, so edits show straight away and can't be hidden by a stale live value.
+ * Everything else comes from the page file, so edits show straight away and can't be hidden by a stale live value.
  * @param cell the cell's stored data
  * @param live_cell what the server last sent for the cell, if anything
  * @param live_controls the fields the cell's plugin sets live

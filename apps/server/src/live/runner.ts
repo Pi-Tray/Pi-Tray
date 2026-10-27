@@ -1,6 +1,6 @@
 import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS, unwrap_plugin_reference} from "../types";
 
-import {add_grid_change_listener, get_loaded_grid} from "../pages";
+import {add_pages_change_listener, get_page, home_page_id} from "../pages";
 import {
     add_plugin_cache_cleared_listener,
     add_plugin_stop_listener,
@@ -66,13 +66,14 @@ const find_desired_tiles = (): Map<string, DesiredTile> => {
         return desired_tiles;
     }
 
-    for (const [row_key, row] of Object.entries(get_loaded_grid())) {
+    // TODO: every page, once live state is per page
+    for (const [row_key, row] of Object.entries(get_page(home_page_id()) ?? {})) {
         for (const [col_key, cell] of Object.entries(row)) {
-            if (!cell?.plugin) {
+            if (cell?.action?.kind !== "plugin") {
                 continue;
             }
 
-            const {name: plugin_name, config} = unwrap_plugin_reference(cell.plugin);
+            const {name: plugin_name, config} = unwrap_plugin_reference(cell.action.plugin);
 
             let plugin: Plugin;
             try {
@@ -341,8 +342,8 @@ set_tile_error_handler((context, error) => {
     }
 });
 
-// a changed cell may need its tile started, stopped or restarted
-add_grid_change_listener(async () => reconcile_live_tiles());
+// a changed cell or page may need its tile started, stopped or restarted
+add_pages_change_listener(() => reconcile_live_tiles());
 
 // stop every tile before the plugins are disposed, on a reload or when the server stops
 add_plugin_stop_listener(() => {

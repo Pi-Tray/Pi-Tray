@@ -6,7 +6,7 @@ import {dataDir, join} from "@tauri-apps/api/path";
 export const data_dir = await join(await dataDir(), "pi-tray");
 
 /**
- * A path inside Pi-Tray's data folder, e.g. await in_data_dir("grid.json").
+ * A path inside Pi-Tray's data folder, e.g. await in_data_dir("pages.json").
  */
 export const in_data_dir = (...segments: string[]): Promise<string> => join(data_dir, ...segments);
 

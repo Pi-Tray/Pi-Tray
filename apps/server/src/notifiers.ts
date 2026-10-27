@@ -1,7 +1,7 @@
 import type {Client} from "./clients";
 
 import type {CellPayload, ServerMessage} from "./types";
-import {add_grid_change_listener, get_loaded_grid, get_shape_of_loaded_grid, GridChangeListener, remove_grid_change_listener} from "./pages";
+import {add_pages_change_listener, get_page, get_shape, home_page_id, PagesChangeListener} from "./pages";
 import {add_asset_change_listener} from "./assets";
 import {build_cell_payload, build_grid_payload} from "./cell_payload";
 import {add_live_state_listener} from "./live/state";
@@ -37,6 +37,10 @@ export const send_full_grid = (client: Client) => {
  * @returns a function that stops the notifications, call it when the connection closes
  */
 export const register_notifiers = (client: Client): (() => void) => {
+    // TODO: the client's current page, once devices have one
+    const current_page_id = () => home_page_id();
+    const current_cells = () => get_page(current_page_id()) ?? {};
+
     // what the client was last sent for each cell, as JSON, so unchanged cells aren't sent again
     let last_sent = new Map<string, string>();
 
@@ -46,7 +50,7 @@ export const register_notifiers = (client: Client): (() => void) => {
     const flush = () => {
         flush_timer = null;
 
-        const grid = get_loaded_grid();
+        const grid = current_cells();
         const payloads: CellPayload[] = [];
 
         for (const [key, {row_idx, col_idx}] of pending_cells) {
@@ -78,7 +82,7 @@ export const register_notifiers = (client: Client): (() => void) => {
     }
 
     const notifier_send_full_grid = () => {
-        const payloads = build_grid_payload(get_loaded_grid());
+        const payloads = build_grid_payload(current_cells());
 
         // the full grid covers anything still waiting to be sent
         pending_cells.clear();
@@ -92,22 +96,27 @@ export const register_notifiers = (client: Client): (() => void) => {
         send_message(client, {action: "update_cells", payload: payloads});
     }
 
-    const grid_changed: GridChangeListener = async (changes) => {
+    const pages_changed: PagesChangeListener = (changes) => {
         for (const change of changes) {
-            if (change === "shape") {
-                // the client rebuilds its grid and asks for every cell again, so no need to send cells here
-                send_message(client, {action: "size", payload: get_shape_of_loaded_grid()});
-                continue;
+            switch (change.kind) {
+                case "shape":
+                    // the client rebuilds its grid and asks for every cell again, so no need to send cells here
+                    send_message(client, {action: "size", payload: get_shape()});
+                    break;
+                case "cell":
+                    // an empty cell sends an empty payload, which clears the button
+                    if (change.page === current_page_id()) {
+                        queue_cell(change.row_idx, change.col_idx);
+                    }
+                    break;
+                // TODO: page_removed, page_renamed and home_changed, once devices have a current page
             }
-
-            // an empty cell sends an empty payload, which clears the button
-            queue_cell(change.row_idx, change.col_idx);
         }
     }
 
     // grid.json doesn't change when an asset's image is replaced, so resend every cell using it
     const asset_changed = (asset_id: string) => {
-        const grid = get_loaded_grid();
+        const grid = current_cells();
 
         for (const [row_key, row] of Object.entries(grid)) {
             for (const [col_key, cell] of Object.entries(row)) {
@@ -118,12 +127,12 @@ export const register_notifiers = (client: Client): (() => void) => {
         }
     }
 
-    add_grid_change_listener(grid_changed);
+    const remove_pages_listener = add_pages_change_listener(pages_changed);
     const remove_asset_listener = add_asset_change_listener(asset_changed);
     const remove_live_listener = add_live_state_listener(queue_cell);
 
     const unregister = () => {
-        remove_grid_change_listener(grid_changed);
+        remove_pages_listener();
         remove_asset_listener();
         remove_live_listener();
 

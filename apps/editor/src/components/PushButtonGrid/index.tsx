@@ -14,7 +14,7 @@ interface PushButtonGridProps {
 }
 
 /**
- * The grid as grid.json describes it, each button reading its own cell.
+ * The page being edited, each button reading its own cell.
  * @param highlight the button to outline, e.g. the one being edited
  * @returns the element
  */

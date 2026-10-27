@@ -3,7 +3,8 @@ import {Activity} from "lucide-react";
 
 import {PushButtonDisplay, PushButtonFace} from "@pi-tray/ui/PushButtonFace";
 
-import {useGridCell} from "../../util/grid";
+import {useGridCell} from "../../util/pages";
+import {useEditingPage} from "../../contexts/EditingPageContext";
 import {useAsset} from "../../util/assets.ts";
 import {unwrap_plugin_reference, usePluginInfo} from "../../util/plugins.ts";
 import {merge_live_cell, useLiveCell} from "../../util/live_overlay.ts";
@@ -21,11 +22,11 @@ interface PushButtonProps {
  * @returns the element
  */
 export const PushButton = ({x, y, on_click, highlighted, className}: PushButtonProps) => {
-    // grid.json is row first, so y comes before x
-    const [stored_cell] = useGridCell(y, x);
+    // page files are row first, so y comes before x
+    const [stored_cell] = useGridCell(useEditingPage(), y, x);
 
     // live plugins' values from the server, only for the fields the plugin says it controls
-    const plugin_name = stored_cell?.plugin ? unwrap_plugin_reference(stored_cell.plugin).name : null;
+    const plugin_name = stored_cell?.action?.kind === "plugin" ? unwrap_plugin_reference(stored_cell.action.plugin).name : null;
     const plugin_info = usePluginInfo(plugin_name);
     const live_cell = useLiveCell(y, x, plugin_name);
     const is_live = (plugin_info?.live_controls?.length ?? 0) > 0;

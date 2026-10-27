@@ -1,6 +1,6 @@
 import type {MessageHandler} from "../types";
 
-import {get_loaded_grid} from "../pages";
+import {get_page, home_page_id} from "../pages";
 import {load_plugin} from "../plugins";
 import {unwrap_plugin_reference} from "../types";
 import {plugin_context} from "../plugin_context";
@@ -8,15 +8,18 @@ import {package_data_folder} from "@pi-tray/installer/read";
 import {split_plugin_reference} from "@pi-tray/package-spec";
 
 export default (async (client, payload) => {
-    const grid = get_loaded_grid();
+    // TODO: the device's current page, once devices have one
+    const cells = get_page(home_page_id()) ?? {};
 
-    const cell = grid[payload.y]?.[payload.x];
-    if (!cell || !cell.plugin) {
+    const action = cells[payload.y]?.[payload.x]?.action;
+
+    // TODO: change page for links
+    if (action?.kind !== "plugin") {
         // nothing to do if the cell is empty or has no plugin
         return;
     }
 
-    const {name: plugin_name, config: plugin_config} = unwrap_plugin_reference(cell.plugin);
+    const {name: plugin_name, config: plugin_config} = unwrap_plugin_reference(action.plugin);
 
     try {
 
