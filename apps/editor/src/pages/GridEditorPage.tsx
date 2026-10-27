@@ -427,7 +427,7 @@ export const GridEditorPage = () => {
                 <div className={`flex-1 flex flex-col h-full max-h-full max-w-full gap-4 ${selected_button ? "w-25 mr-79" : "w-full mr-0"}`}>
                     <h1 className="text-2xl font-bold">Edit grid</h1>
 
-                    <div className="flex-1">
+                    <div className="flex-1 min-h-0">
                         <PushButtonGrid rows={shape.rows} cols={shape.cols} on_click={button_clicked} highlight={selected_button} />
                     </div>
 
