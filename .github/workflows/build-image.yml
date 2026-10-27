@@ -173,16 +173,29 @@ jobs:
             gh release create "$release_tag" out/* --repo "${{ github.repository }}" --title "$release_tag" --generate-notes --latest=false
           fi
 
-      # Imager's repository url points at this release, so it always lists the newest image
+      # a fixed page for the newest image, as release search no longer matches tag names
+      # Imager's repository url points at its os_list.json, so it always lists the newest image
       - name: Update the rolling image-latest release
         if: needs.check.outputs.should_publish == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          release_tag="${{ needs.check.outputs.release_tag }}"
+          release_url="https://github.com/${{ github.repository }}/releases"
+
           if ! gh release view image-latest --repo "${{ github.repository }}" > /dev/null 2>&1; then
-            gh release create image-latest --repo "${{ github.repository }}" --title "Latest image (for Raspberry Pi Imager)" \
-              --notes "Holds os_list.json for Raspberry Pi Imager, always pointing at the newest image release. Download images from their own releases." \
-              --latest=false
+            gh release create image-latest --repo "${{ github.repository }}" --title "Latest Raspberry Pi image" --notes "" --latest=false
           fi
 
-          gh release upload image-latest out/os_list.json --repo "${{ github.repository }}" --clobber
+          # images are named by date, so the previous one doesn't get replaced by the upload and has to go first
+          gh release view image-latest --repo "${{ github.repository }}" --json assets -q '.assets[].name' | grep '\.img\.xz$' | while IFS= read -r old_image; do
+            gh release delete-asset image-latest "$old_image" --repo "${{ github.repository }}" --yes
+          done
+
+          gh release upload image-latest out/*.img.xz out/os_list.json --repo "${{ github.repository }}" --clobber
+
+          gh release edit image-latest --repo "${{ github.repository }}" --title "Latest Raspberry Pi image" --notes "The newest Pi-Tray image, from [$release_tag]($release_url/tag/$release_tag). Download the \`.img.xz\` below.
+
+          Flash it with Raspberry Pi Imager's **Use Custom**, or give Imager this repository so it can apply your settings: \`$release_url/download/image-latest/os_list.json\`
+
+          See the [image's readme](https://github.com/${{ github.repository }}/blob/main/apps/image/README.md) for the details."

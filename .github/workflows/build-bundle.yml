@@ -230,7 +230,7 @@ jobs:
           cat >> release-notes.md <<EOF
           
           ---
-          Setting up a new Raspberry Pi? Get the image from the [image releases](https://github.com/${{ github.repository }}/releases?q=image-&expanded=true). Pis already set up update themselves.
+          Setting up a new Raspberry Pi? Get the image from the [latest image release](https://github.com/${{ github.repository }}/releases/tag/image-latest). Pis already set up update themselves.
           EOF
             
           if gh release view "$release_tag" --repo "${{ github.repository }}" > /dev/null 2>&1; then

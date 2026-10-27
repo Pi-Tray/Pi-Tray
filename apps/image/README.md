@@ -37,7 +37,7 @@ This lets Imager apply your settings.
 
 ### Option 2: Use Custom
 
-1. Download the latest `.img.xz` from the [image releases](https://github.com/Pi-Tray/pi-tray/releases?q=image-&expanded=true), the ones tagged `image-`. There's no need to unzip it.
+1. Download the `.img.xz` from the [latest image release](https://github.com/Pi-Tray/pi-tray/releases/tag/image-latest). There's no need to unzip it.
 2. In Imager, choose your Pi model, then **Choose OS → Use Custom** and select the file.
 3. Choose your SD card and write it.
 
