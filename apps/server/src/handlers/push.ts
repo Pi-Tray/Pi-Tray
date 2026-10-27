@@ -1,6 +1,6 @@
 import type {MessageHandler} from "../types";
 
-import {get_loaded_grid} from "../data";
+import {get_loaded_grid} from "../pages";
 import {load_plugin} from "../plugins";
 import {unwrap_plugin_reference} from "../types";
 import {plugin_context} from "../plugin_context";

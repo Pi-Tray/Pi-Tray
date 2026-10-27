@@ -1,6 +1,6 @@
 import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS, unwrap_plugin_reference} from "../types";
 
-import {add_grid_change_listener, get_loaded_grid} from "../data";
+import {add_grid_change_listener, get_loaded_grid} from "../pages";
 import {
     add_plugin_cache_cleared_listener,
     add_plugin_stop_listener,

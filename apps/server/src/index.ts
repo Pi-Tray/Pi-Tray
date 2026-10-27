@@ -8,7 +8,7 @@ import {createServer} from "http";
 import type { MessageHandler } from "./types";
 
 // ensure data init scripts run
-import {write_ws_url_for_editor} from "./data";
+import {write_ws_url_for_editor} from "./pages";
 
 import {register_notifiers} from "./notifiers";
 

@@ -4,7 +4,7 @@ import {unwrap_plugin_reference} from "./types";
 import {resolve_asset_url} from "./assets";
 import {get_live_state} from "./live/state";
 import {load_plugin} from "./plugins";
-import {GridData} from "./data";
+import {PageData} from "./pages";
 
 /**
  * Whether pressing a cell does anything, so clients can skip press feedback for cells that don't.

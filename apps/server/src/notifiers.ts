@@ -1,7 +1,7 @@
 import type {Client} from "./clients";
 
 import type {CellPayload, ServerMessage} from "./types";
-import {add_grid_change_listener, get_loaded_grid, get_shape_of_loaded_grid, GridChangeListener, remove_grid_change_listener} from "./data";
+import {add_grid_change_listener, get_loaded_grid, get_shape_of_loaded_grid, GridChangeListener, remove_grid_change_listener} from "./pages";
 import {add_asset_change_listener} from "./assets";
 import {build_cell_payload, build_grid_payload} from "./cell_payload";
 import {add_live_state_listener} from "./live/state";

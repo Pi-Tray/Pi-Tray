@@ -56,14 +56,19 @@ export interface CellData {
     background?: string;
 }
 
+export type PageCells = { [row_idx: number]: { [col_idx: number]: CellData } };
+
 export interface PageData {
-    row_data: CellData[][];
+    row_data: PageCells;
 }
 
 export interface GridShape {
     rows: number;
     cols: number;
 }
+
+export const DEFAULT_GRID_SHAPE: GridShape = {rows: 3, cols: 5};
+export const PAGE_ID_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
 
 export interface PageManifest {
     home: string; // uuid
@@ -190,7 +195,7 @@ export type PluginConfig = { [key: string]: any };
 export const PLUGIN_LIVE_CONTROL_FIELDS = {
     label: ["text", "text_is_icon"],
     background: ["background"],
-} as const satisfies Record<string, readonly Exclude<keyof CellData, "plugin">[]>;
+} as const satisfies Record<string, readonly Exclude<keyof CellData, "action">[]>;
 
 export const PLUGIN_LIVE_CONTROLLABLE = Object.keys(PLUGIN_LIVE_CONTROL_FIELDS) as (keyof typeof PLUGIN_LIVE_CONTROL_FIELDS)[];
 
