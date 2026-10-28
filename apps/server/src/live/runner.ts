@@ -1,6 +1,6 @@
 import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS, unwrap_plugin_reference} from "../types";
 
-import {add_pages_change_listener, get_page, home_page_id} from "../pages";
+import {add_pages_change_listener, get_manifest, get_page} from "../pages";
 import {
     add_plugin_cache_cleared_listener,
     add_plugin_stop_listener,
@@ -18,6 +18,7 @@ const MIN_UPDATE_INTERVAL_MS = 100;
 const RESTART_DELAYS_MS = [1000, 5000, 30000];
 
 interface RunningTile {
+    page_id: string;
     row_idx: number;
     col_idx: number;
     controller: AbortController;
@@ -33,6 +34,7 @@ interface RunningTile {
 }
 
 interface DesiredTile {
+    page_id: string;
     row_idx: number;
     col_idx: number;
     plugin: Plugin;
@@ -41,7 +43,7 @@ interface DesiredTile {
     key: string;
 }
 
-// keyed by "row,col"
+// keyed by "page,row,col"
 const running_tiles = new Map<string, RunningTile>();
 
 // tiles waiting to restart after a failure, and how many times in a row each has failed
@@ -54,7 +56,7 @@ let client_count = 0;
 // stopped tiles that ignored their signal and keep throwing, each only logged once
 const noisy_stopped_tiles = new WeakSet<RunningTile>();
 
-const cell_key = (row_idx: number, col_idx: number) => `${row_idx},${col_idx}`;
+const tile_key = (page_id: string, row_idx: number, col_idx: number) => `${page_id},${row_idx},${col_idx}`;
 
 /**
  * Works out which cells should have a live tile running, from the grid and the connected clients.
@@ -66,38 +68,41 @@ const find_desired_tiles = (): Map<string, DesiredTile> => {
         return desired_tiles;
     }
 
-    // TODO: every page, once live state is per page
-    for (const [row_key, row] of Object.entries(get_page(home_page_id()) ?? {})) {
-        for (const [col_key, cell] of Object.entries(row)) {
-            if (cell?.action?.kind !== "plugin") {
-                continue;
+    // every page, not just the ones being looked at, so switching page shows live values straight away
+    for (const page_id of get_manifest().order) {
+        for (const [row_key, row] of Object.entries(get_page(page_id) ?? {})) {
+            for (const [col_key, cell] of Object.entries(row)) {
+                if (cell?.action?.kind !== "plugin") {
+                    continue;
+                }
+
+                const {name: plugin_name, config} = unwrap_plugin_reference(cell.action.plugin);
+
+                let plugin: Plugin;
+                try {
+                    plugin = load_plugin(plugin_name);
+                } catch (error) {
+                    // a plugin that can't load can't run live either, pushes report the error to the user
+                    continue;
+                }
+
+                if (!plugin.live) {
+                    continue;
+                }
+
+                const row_idx = Number(row_key);
+                const col_idx = Number(col_key);
+
+                desired_tiles.set(tile_key(page_id, row_idx, col_idx), {
+                    page_id,
+                    row_idx,
+                    col_idx,
+                    plugin,
+                    plugin_name,
+                    config,
+                    key: JSON.stringify([plugin_name, config])
+                });
             }
-
-            const {name: plugin_name, config} = unwrap_plugin_reference(cell.action.plugin);
-
-            let plugin: Plugin;
-            try {
-                plugin = load_plugin(plugin_name);
-            } catch (error) {
-                // a plugin that can't load can't run live either, pushes report the error to the user
-                continue;
-            }
-
-            if (!plugin.live) {
-                continue;
-            }
-
-            const row_idx = Number(row_key);
-            const col_idx = Number(col_key);
-
-            desired_tiles.set(cell_key(row_idx, col_idx), {
-                row_idx,
-                col_idx,
-                plugin,
-                plugin_name,
-                config,
-                key: JSON.stringify([plugin_name, config])
-            });
         }
     }
 
@@ -126,7 +131,7 @@ const schedule_flush = (tile: RunningTile) => {
         tile.pending_state = null;
         tile.last_flush_at = Date.now();
 
-        set_live_state(tile.row_idx, tile.col_idx, state);
+        set_live_state(tile.page_id, tile.row_idx, tile.col_idx, state);
     }, wait_ms);
 }
 
@@ -159,7 +164,7 @@ const stop_tile = (key: string, clear_state = true) => {
     }
 
     if (clear_state) {
-        clear_live_state(tile.row_idx, tile.col_idx);
+        clear_live_state(tile.page_id, tile.row_idx, tile.col_idx);
     }
 }
 
@@ -188,6 +193,7 @@ const start_tile = (key: string, desired: DesiredTile) => {
     const controller = new AbortController();
 
     const tile: RunningTile = {
+        page_id: desired.page_id,
         row_idx: desired.row_idx,
         col_idx: desired.col_idx,
         controller,

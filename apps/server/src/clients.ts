@@ -15,8 +15,77 @@ export interface ClientIdentity {
  * A connected client, wrapping its secure session to simplify server impl.<br>
  * Only created once the client has logged in.
  */
+// enough for back to retrace a menu, without growing forever on a device that's left running
+const MAX_PAGE_HISTORY = 20;
+
 export class Client {
-    constructor(private readonly session: Session<WireMessage>, readonly identity: ClientIdentity) {}
+    #current_page: string;
+    #page_history: string[] = [];
+    #page_change_listener: (() => void) | null = null;
+
+    /**
+     * @param initial_page the page to show first, e.g. the one a device was on last time
+     */
+    constructor(private readonly session: Session<WireMessage>, readonly identity: ClientIdentity, initial_page: string) {
+        this.#current_page = initial_page;
+    }
+
+    /**
+     * The page this client is shown. For the editor, the page it's editing.
+     */
+    get current_page(): string {
+        return this.#current_page;
+    }
+
+    /**
+     * Called whenever the page changes, so the notifier can send it. Only one, as only the notifier needs it.
+     */
+    set_page_change_listener(listener: (() => void) | null): void {
+        this.#page_change_listener = listener;
+    }
+
+    /**
+     * Shows another page, remembering this one for {@link go_back}.
+     * @param remember_history false for a change nobody should go back from, e.g. the editor switching pages
+     */
+    show_page(page_id: string, remember_history = true): void {
+        if (this.#current_page === page_id) {
+            return;
+        }
+
+        if (remember_history) {
+            this.#page_history.push(this.#current_page);
+
+            if (this.#page_history.length > MAX_PAGE_HISTORY) {
+                this.#page_history.shift();
+            }
+        }
+
+        this.#current_page = page_id;
+        this.#page_change_listener?.();
+    }
+
+    /**
+     * Goes back to the page before this one, skipping any that were deleted since.<br>
+     * Doesn't add the current page to the history, so going back twice doesn't bounce between the same two.
+     * @param page_exists whether a page is still there to go back to
+     * @returns whether there was a page to go back to
+     */
+    go_back(page_exists: (page_id: string) => boolean): boolean {
+        let previous = this.#page_history.pop();
+
+        while (previous !== undefined && !page_exists(previous)) {
+            previous = this.#page_history.pop();
+        }
+
+        if (previous === undefined) {
+            return false;
+        }
+
+        this.#current_page = previous;
+        this.#page_change_listener?.();
+        return true;
+    }
 
     get is_editor(): boolean {
         return this.identity.role === "editor";

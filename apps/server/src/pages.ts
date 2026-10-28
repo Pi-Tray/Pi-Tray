@@ -193,6 +193,13 @@ export const get_shape = (): GridShape => manifest.shape;
 
 export const home_page_id = (): string => manifest.home;
 
+/**
+ * The page a device starts on and goes to with a home link.<br>
+ * The same for every device for now, which is where a per-device home would go.
+ * @param _public_key the device's key
+ */
+export const home_page_for = (_public_key: string): string => manifest.home;
+
 export const page_exists = (page_id: string): boolean => pages.has(page_id);
 
 /**

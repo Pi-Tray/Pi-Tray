@@ -10,5 +10,6 @@ export { default as submit_pairing_code } from "./submit_pairing_code";
 export { default as list_paired_devices } from "./list_paired_devices";
 export { default as revoke_paired_device } from "./revoke_paired_device";
 export { default as retry_client_update } from "./retry_client_update";
+export { default as view_page } from "./view_page";
 export { default as reload } from "./reload";
 export { default as reload_plugins } from "./reload_plugins";

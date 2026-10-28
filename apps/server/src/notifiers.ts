@@ -1,16 +1,16 @@
 import type {Client} from "./clients";
 
 import type {CellPayload, ServerMessage} from "./types";
-import {add_pages_change_listener, get_page, get_shape, home_page_id, PagesChangeListener} from "./pages";
+import {add_pages_change_listener, get_page, get_page_name, get_shape, home_page_for, home_page_id, PagesChangeListener} from "./pages";
 import {add_asset_change_listener} from "./assets";
 import {build_cell_payload, build_grid_payload} from "./cell_payload";
 import {add_live_state_listener} from "./live/state";
 
-// how long to collect changed cells before sending them, so changes close together go out as one set_cells
+// how long to collect changed cells before sending them, so changes close together go out as one update_cells
 const FLUSH_DELAY_MS = 16;
 
 interface CellNotifier {
-    send_full_grid: () => void;
+    send_page: () => void;
     unregister: () => void;
 }
 
@@ -23,23 +23,25 @@ const send_message = (client: Client, message: ServerMessage) => {
 }
 
 /**
- * Sends every filled cell to the client in one set_cells, e.g. when it first loads or its grid size changes.
+ * Sends the client's whole current page in one set_page, which replaces everything it's showing,
+ * e.g. when it first loads or its grid size changes. Changing page sends it by itself.
  * @param client the client
  */
-export const send_full_grid = (client: Client) => {
-    notifiers.get(client)?.send_full_grid();
+export const send_page = (client: Client) => {
+    notifiers.get(client)?.send_page();
 }
 
 /**
  * Starts sending the client every change to the grid, its assets and live plugin values.<br>
- * Changed cells are batched into one set_cells, and cells that look the same as what the client already has are skipped.
+ * Changed cells are batched into one update_cells, and cells that look the same as what the client already has are skipped.
  * @param client the client
  * @returns a function that stops the notifications, call it when the connection closes
  */
 export const register_notifiers = (client: Client): (() => void) => {
-    // TODO: the client's current page, once devices have one
-    const current_page_id = () => home_page_id();
-    const current_cells = () => get_page(current_page_id()) ?? {};
+    const current_cells = () => get_page(client.current_page) ?? {};
+
+    // where a client goes when its page is deleted
+    const home_for_client = () => client.identity.role === "device" ? home_page_for(client.identity.public_key) : home_page_id();
 
     // what the client was last sent for each cell, as JSON, so unchanged cells aren't sent again
     let last_sent = new Map<string, string>();
@@ -54,7 +56,7 @@ export const register_notifiers = (client: Client): (() => void) => {
         const payloads: CellPayload[] = [];
 
         for (const [key, {row_idx, col_idx}] of pending_cells) {
-            const payload = build_cell_payload(col_idx, row_idx, grid[row_idx]?.[col_idx]);
+            const payload = build_cell_payload(client.current_page, col_idx, row_idx, grid[row_idx]?.[col_idx]);
             const payload_json = JSON.stringify(payload);
 
             // e.g. only the cell's plugin or config changed, which clients don't see
@@ -81,19 +83,23 @@ export const register_notifiers = (client: Client): (() => void) => {
         }
     }
 
-    const notifier_send_full_grid = () => {
-        const payloads = build_grid_payload(current_cells());
-
-        // the full grid covers anything still waiting to be sent
+    const notifier_send_page = () => {
+        // anything still waiting is for what the client showed before, and must not land on top of the new page
+        if (flush_timer !== null) {
+            clearTimeout(flush_timer);
+            flush_timer = null;
+        }
         pending_cells.clear();
 
-        // the client starts from an empty grid, so forget everything sent before
+        const payloads = build_grid_payload(client.current_page, current_cells());
+
+        // set_page replaces everything the client shows, so forget everything sent before
         last_sent = new Map();
         for (const payload of payloads) {
             last_sent.set(cell_key(payload.y, payload.x), JSON.stringify(payload));
         }
 
-        send_message(client, {action: "update_cells", payload: payloads});
+        send_message(client, {action: "set_page", payload: {name: get_page_name(client.current_page) ?? "", cells: payloads}});
     }
 
     const pages_changed: PagesChangeListener = (changes) => {
@@ -105,16 +111,28 @@ export const register_notifiers = (client: Client): (() => void) => {
                     break;
                 case "cell":
                     // an empty cell sends an empty payload, which clears the button
-                    if (change.page === current_page_id()) {
+                    if (change.page === client.current_page) {
                         queue_cell(change.row_idx, change.col_idx);
                     }
                     break;
-                // TODO: page_removed, page_renamed and home_changed, once devices have a current page
+                case "page_removed":
+                    // nothing left to show, and the change sends the home page
+                    if (change.page === client.current_page) {
+                        client.show_page(home_for_client(), false);
+                    }
+                    break;
+                case "page_renamed":
+                    // the name only comes with set_page
+                    if (change.page === client.current_page) {
+                        notifier_send_page();
+                    }
+                    break;
+                // page_added and home_changed: devices stay on the page they're on
             }
         }
     }
 
-    // grid.json doesn't change when an asset's image is replaced, so resend every cell using it
+    // the page doesn't change when an asset's image is replaced, so resend every cell using it
     const asset_changed = (asset_id: string) => {
         const grid = current_cells();
 
@@ -129,12 +147,19 @@ export const register_notifiers = (client: Client): (() => void) => {
 
     const remove_pages_listener = add_pages_change_listener(pages_changed);
     const remove_asset_listener = add_asset_change_listener(asset_changed);
-    const remove_live_listener = add_live_state_listener(queue_cell);
+    const remove_live_listener = add_live_state_listener((page_id, row_idx, col_idx) => {
+        if (page_id === client.current_page) {
+            queue_cell(row_idx, col_idx);
+        }
+    });
+
+    client.set_page_change_listener(notifier_send_page);
 
     const unregister = () => {
         remove_pages_listener();
         remove_asset_listener();
         remove_live_listener();
+        client.set_page_change_listener(null);
 
         if (flush_timer !== null) {
             clearTimeout(flush_timer);
@@ -143,7 +168,7 @@ export const register_notifiers = (client: Client): (() => void) => {
         notifiers.delete(client);
     };
 
-    notifiers.set(client, {send_full_grid: notifier_send_full_grid, unregister});
+    notifiers.set(client, {send_page: notifier_send_page, unregister});
 
     // call when the connection closes, otherwise the listeners live forever and keep sending to a dead client
     return unregister;

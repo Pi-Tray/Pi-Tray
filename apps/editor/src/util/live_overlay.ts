@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useSyncExternalStore} from "react";
 
-import type {CellData, PluginLiveControllable, ServerMessage} from "@pi-tray/types";
+import type {CellData, CellPayload, PluginLiveControllable, ServerMessage} from "@pi-tray/types";
 import {ASSET_PATH_PATTERN} from "@pi-tray/types";
 
 import {useChannel, useChannelMessage, useChannelReady, useChannelStatus} from "../contexts/WSProvider";
@@ -35,11 +35,19 @@ const asset_id_from_url = (url: string | null): string | null => {
 }
 
 const handle_message = (message: ServerMessage) => {
-    if (message.action !== "update_cells" || !Array.isArray(message.payload)) {
+    let cells: CellPayload[];
+
+    if (message.action === "update_cells" && Array.isArray(message.payload)) {
+        cells = message.payload;
+    } else if (message.action === "set_page" && Array.isArray(message.payload?.cells)) {
+        // a whole page replaces everything, e.g. the values from the page the editor was on before
+        live_cells.clear();
+        cells = message.payload.cells;
+    } else {
         return;
     }
 
-    for (const {x, y, text, is_icon, background} of message.payload) {
+    for (const {x, y, text, is_icon, background} of cells) {
         if (typeof x !== "number" || typeof y !== "number") {
             continue;
         }
@@ -83,16 +91,20 @@ const subscribe = (listener: () => void) => {
  * Feeds live values from the server into the overlay. Use once, anywhere inside the WSProvider,
  * e.g. in the grid editor page, so every PushButton can read from it.<br>
  * Everything is cleared when the connection changes or closes, so stale values are never shown.
+ * @param page_id the page being edited, which the server is told so it sends that page's values
  */
-export const useLiveOverlayConnection = () => {
+export const useLiveOverlayConnection = (page_id: string) => {
     const channel = useChannel();
     const status = useChannelStatus();
 
     useChannelMessage(handle_message);
 
-    // the server only sends cells when they change, so ask for everything to fill the overlay straight away
-    const request_all = useCallback(() => channel?.send({action: "all_buttons"}), [channel]);
-    useChannelReady(request_all);
+    // switching page sends the whole page by itself, and asking for everything covers the page the server already had
+    const request_page = useCallback(() => {
+        channel?.send({action: "view_page", payload: {page: page_id}});
+        channel?.send({action: "all_buttons"});
+    }, [channel, page_id]);
+    useChannelReady(request_page);
 
     // never show stale values once the connection drops or changes
     useEffect(() => {

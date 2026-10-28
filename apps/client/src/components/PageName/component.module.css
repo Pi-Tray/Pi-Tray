@@ -1,0 +1,14 @@
+.element {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 1em;
+    color: #aaa;
+
+    position: absolute;
+    top: 0.5em;
+    right: 0.75em;
+
+    max-width: 40vw;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

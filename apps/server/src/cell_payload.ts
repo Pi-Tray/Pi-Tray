@@ -32,13 +32,14 @@ const is_pushable = (cell: CellData | undefined): boolean => {
 
 /**
  * Builds the set_cell payload for a cell, shared by every place that sends cells to clients.
+ * @param page_id the cell's page, for its live values
  * @param col_idx the cell's column, sent as x
  * @param row_idx the cell's row, sent as y
  * @param cell the cell's data, or undefined for an empty cell
  */
-export const build_cell_payload = (col_idx: number, row_idx: number, cell: CellData | undefined): CellPayload => {
+export const build_cell_payload = (page_id: string, col_idx: number, row_idx: number, cell: CellData | undefined): CellPayload => {
     // live values from plugins win over the stored ones, field by field
-    const live_state = get_live_state(row_idx, col_idx);
+    const live_state = get_live_state(page_id, row_idx, col_idx);
     if (cell && live_state) {
         cell = {...cell, ...live_state};
     }
@@ -55,16 +56,17 @@ export const build_cell_payload = (col_idx: number, row_idx: number, cell: CellD
 }
 
 /**
- * Builds the payload for every filled cell in the grid, for sending the whole grid in one set_cells.
+ * Builds the payload for every filled cell in the grid, for sending a whole page in one set_page.
+ * @param page_id the page, for its cells' live values
  * @param grid the grid to build payloads for
  */
-export const build_grid_payload = (grid: PageCells): CellPayload[] => {
+export const build_grid_payload = (page_id: string, grid: PageCells): CellPayload[] => {
     const payloads: CellPayload[] = [];
 
     for (const [row_key, row] of Object.entries(grid)) {
         for (const [col_key, cell] of Object.entries(row)) {
             if (cell) {
-                payloads.push(build_cell_payload(Number(col_key), Number(row_key), cell));
+                payloads.push(build_cell_payload(page_id, Number(col_key), Number(row_key), cell));
             }
         }
     }

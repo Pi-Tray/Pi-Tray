@@ -1,5 +1,6 @@
 import {WSProvider} from "./contexts/WSContext";
 import {WSStatus} from "./components/WSStatus";
+import {PageName} from "./components/PageName";
 
 import {WSPushButtonGrid} from "./components/PushButtonGrid";
 import {PairingUI} from "./components/PairingUI";
@@ -21,6 +22,7 @@ export default function App() {
             <ClientUpdates />
 
             <WSStatus />
+            <PageName />
             <PairingUI />
 
             <WSPushButtonGrid className="grid" />

@@ -395,13 +395,13 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
 }
 
 export const GridEditorPage = () => {
-    // live tile previews from the server
-    useLiveOverlayConnection();
-
     const [shape, setGridShape] = useGridShape();
 
     // TODO: the page picked in the page switcher
     const page_id = usePageManifest().home;
+
+    // live tile previews from the server, for the page being edited
+    useLiveOverlayConnection(page_id);
 
     // when a button is selected, the sidebar will be open
     const [selected_button, setSelectedButton] = useState<{x: number, y: number} | null>(null);

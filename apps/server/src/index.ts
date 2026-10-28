@@ -8,7 +8,7 @@ import {createServer} from "http";
 import type { MessageHandler } from "./types";
 
 // ensure data init scripts run
-import "./pages";
+import {home_page_for, home_page_id, page_exists} from "./pages";
 import {write_ws_url_for_editor} from "./editor_config";
 
 import {register_notifiers} from "./notifiers";
@@ -17,7 +17,7 @@ import {Client, ClientIdentity, connected_clients, WireMessage} from "./clients"
 import {NodeWebSocketTransport} from "./transport";
 import {CloseCode, handle_login_server, Session, start_server_session} from "@pi-tray/secure-channel";
 import {get_editor_public_key, load_identities} from "./identity";
-import {find_paired_key, touch_paired_device} from "./paired_devices";
+import {find_paired_key, get_device_page, touch_paired_device} from "./paired_devices";
 import {broadcast_paired_devices, get_pairing_state, pair_unknown_device, pairing_connection_closed} from "./pairing";
 import {live_client_connected, live_client_disconnected} from "./live/runner";
 import {apply_arg_overrides, SERVER_CONFIG_FILE} from "@pi-tray/server-config";
@@ -38,6 +38,7 @@ const EDITOR_ONLY_ACTIONS = new Set([
     "list_paired_devices",
     "revoke_paired_device",
     "retry_client_update",
+    "view_page",
     "reload",
     "reload_plugins"
 ]);
@@ -100,6 +101,18 @@ const dispatch = async (client: Client, data: WireMessage) => {
 // the editor logs in with its identity from the data folder, everything else has to be paired
 const find_login_key = (public_key: string): string | null => {
     return public_key === get_editor_public_key() ? public_key : find_paired_key(public_key);
+}
+
+/**
+ * The page a client starts on: a device comes back to the page it was on last, if that still exists.
+ */
+const initial_page_for = (identity: ClientIdentity): string => {
+    if (identity.role === "editor") {
+        return home_page_id();
+    }
+
+    const saved_page = get_device_page(identity.public_key);
+    return saved_page && page_exists(saved_page) ? saved_page : home_page_for(identity.public_key);
 }
 
 /**
@@ -170,7 +183,7 @@ ws_server.on("connection", async ws => {
     console.log(identity.role === "editor" ? "Editor logged in" : "Device logged in");
 
     // nothing below runs until the client has logged in, so handlers and notifiers never see an unauthenticated client
-    const client = new Client(session, identity);
+    const client = new Client(session, identity, initial_page_for(identity));
     connected_clients.add(client);
 
     const unregister_notifiers = register_notifiers(client);

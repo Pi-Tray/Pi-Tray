@@ -98,21 +98,30 @@ export const PushButtonGrid = ({rows, cols, className, button_className, request
         return () => timers.forEach((timer) => clearTimeout(timer));
     }, []);
 
-    // pushes sent before a reconnect never get a reply
-    useEffect(() => {
-        if (channel?.status === "ready") {
-            return;
-        }
-
+    const clear_press_states = useCallback(() => {
         pending_ref_counts.current.clear();
         result_timers.current.forEach((timer) => clearTimeout(timer));
         result_timers.current.clear();
         setStates(new Map());
-    }, [channel?.status]);
+    }, []);
+
+    // pushes sent before a reconnect never get a reply
+    useEffect(() => {
+        if (channel?.status !== "ready") {
+            clear_press_states();
+        }
+    }, [channel?.status, clear_press_states]);
 
     const handle_message = useCallback(
         (message: ServerMessage) => {
             switch (message.action) {
+                case "set_page":
+                    // a whole page replaces everything, including cells the old page had and this one doesn't
+                    setCells(new Map(message.payload.cells.map((cell) => [cell_key(cell.x, cell.y), cell])));
+
+                    // presses belonged to the old page's buttons
+                    clear_press_states();
+                    break;
                 case "update_cells":
                     // may only hold the cells that changed, so the rest keep their last value
                     setCells((previous) => {
@@ -132,7 +141,7 @@ export const PushButtonGrid = ({rows, cols, className, button_className, request
                     break;
             }
         },
-        [show_result]
+        [show_result, clear_press_states]
     );
     useChannelMessage(handle_message);
 

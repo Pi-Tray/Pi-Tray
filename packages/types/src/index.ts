@@ -99,6 +99,11 @@ interface PluginPushHandlerData {
      */
     y: number;
 
+    page: {
+        name: string;
+        id: string;
+    };
+
     /**
      * The configuration specified for the plugin, if any.
      */
@@ -221,6 +226,11 @@ export interface PluginLiveContext<Controls extends PluginLiveControllable> {
 
     x: number;
     y: number;
+
+    page: {
+        name: string;
+        id: string;
+    };
 }
 
 export interface PluginLiveConfig<Controls extends PluginLiveControllable = PluginLiveControllable> {

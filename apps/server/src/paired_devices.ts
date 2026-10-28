@@ -8,7 +8,9 @@ const PAIRED_DEVICES_FILE = in_data_dir("paired_devices.json");
 // online is derived from the live connections, not stored, and public_key is the map key
 // the client fields are missing from devices saved before they existed
 type StoredPairedDevice = Omit<PairedDeviceInfo, "public_key" | "online" | "client_version" | "rejected_update">
-    & Partial<Pick<PairedDeviceInfo, "client_version" | "rejected_update">>;
+    & Partial<Pick<PairedDeviceInfo, "client_version" | "rejected_update">>
+    // the page it was last on, so it comes back to it after a reconnect or restart. only the server needs it
+    & {current_page?: string};
 
 // keyed by public key
 let paired_devices = new Map<string, StoredPairedDevice>();
@@ -90,8 +92,29 @@ export const update_paired_device_client = (public_key: string, client_version: 
     return true;
 }
 
+/**
+ * The page a device was last on, or undefined if it hasn't been anywhere but home.
+ */
+export const get_device_page = (public_key: string): string | undefined => {
+    return paired_devices.get(public_key)?.current_page;
+}
+
+/**
+ * Remembers the page a device is on, for when it reconnects.
+ */
+export const set_device_page = (public_key: string, page_id: string) => {
+    const device = paired_devices.get(public_key);
+
+    if (!device || device.current_page === page_id) {
+        return;
+    }
+
+    device.current_page = page_id;
+    save_paired_devices();
+}
+
 export const list_paired_devices = (online_keys: Set<string>): PairedDeviceInfo[] => {
-    return Array.from(paired_devices, ([public_key, device]) => ({
+    return Array.from(paired_devices, ([public_key, {current_page: _current_page, ...device}]) => ({
         public_key,
         ...device,
         client_version: device.client_version ?? null,
