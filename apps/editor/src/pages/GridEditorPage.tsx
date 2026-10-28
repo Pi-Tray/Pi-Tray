@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from "react";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 
 import {delete_grid_cell, useGridCell, useGridShape, usePageManifest} from "../util/pages";
 import {EditingPageContext, useEditingPage} from "../contexts/EditingPageContext.tsx";
@@ -14,6 +14,7 @@ import {AssetPickerDialog} from "../components/AssetPickerDialog.tsx";
 import {PluginPickerDialog} from "../components/PluginPickerDialog.tsx";
 import {useLiveOverlayConnection} from "../util/live_overlay.ts";
 import {show_alert} from "../util/dialogs.ts";
+import {PageControls} from "../components/PageControls.tsx";
 
 interface SidebarContentProps {
     coords: {x: number, y: number};
@@ -394,11 +395,28 @@ const SidebarContent = ({coords}: SidebarContentProps) => {
     );
 }
 
+let last_edited_page: string | null = null;
+
 export const GridEditorPage = () => {
     const [shape, setGridShape] = useGridShape();
 
-    // TODO: the page picked in the page switcher
-    const page_id = usePageManifest().home;
+    const manifest = usePageManifest();
+
+    // remembered while the editor is open, so leaving the grid editor and coming back stays on the same page
+    const [chosen_page, setChosenPage] = useState(last_edited_page);
+
+    // falls back to home if the chosen page was deleted, e.g. from another window or by hand
+    const page_id = chosen_page && manifest.order.includes(chosen_page) ? chosen_page : manifest.home;
+
+    const show_page = useCallback((new_page_id: string) => {
+        last_edited_page = new_page_id;
+        setChosenPage(new_page_id);
+
+        // the sidebar was for a cell on the old page
+        setSelectedButton(null);
+    }, []);
+
+    const editing_page = useMemo(() => ({page_id, show_page}), [page_id, show_page]);
 
     // live tile previews from the server, for the page being edited
     useLiveOverlayConnection(page_id);
@@ -422,10 +440,10 @@ export const GridEditorPage = () => {
 
 
     return (
-        <EditingPageContext.Provider value={page_id}>
+        <EditingPageContext.Provider value={editing_page}>
             <div className="flex h-full max-h-full w-full max-w-full flex-1">
                 <div className={`flex-1 flex flex-col h-full max-h-full max-w-full gap-4 ${selected_button ? "w-25 mr-79" : "w-full mr-0"}`}>
-                    <h1 className="text-2xl font-bold">Edit grid</h1>
+                    <PageControls selected={page_id} show_page={show_page} />
 
                     <div className="flex-1 min-h-0">
                         <PushButtonGrid rows={shape.rows} cols={shape.cols} on_click={button_clicked} highlight={selected_button} />
