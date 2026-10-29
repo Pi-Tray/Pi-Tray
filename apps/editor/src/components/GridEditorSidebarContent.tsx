@@ -1,14 +1,14 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {usePluginInfo} from "../util/plugins.ts";
-import {Activity, ChevronDown, ImageIcon, MousePointerClick, Plus, Settings, Trash, X} from "lucide-react";
+import {Activity, House, ImageIcon, MousePointerClick, Plus, Settings, Trash, X} from "lucide-react";
 import {PluginPickerDialog} from "./PluginPickerDialog.tsx";
 import {CustomDynamicIcon} from "@pi-tray/ui/CustomDynamicIcon";
 import {IconPickerDialog} from "./IconPicker.tsx";
-import {useEditingPage} from "../contexts/EditingPageContext.tsx";
+import {useEditingPage, useShowEditingPage} from "../contexts/EditingPageContext.tsx";
 import {delete_grid_cell, useGridCell, usePageManifest} from "../util/pages.ts";
 import {CellData, unwrap_plugin_reference} from "@pi-tray/types";
 import {useChannel} from "../contexts/WSProvider.tsx";
-import {show_alert} from "../util/dialogs.ts";
+import {show_alert, show_confirm} from "../util/dialogs.ts";
 import {ConfigEditDialog} from "./ConfigEditDialog.tsx";
 import {AssetPickerDialog} from "./AssetPickerDialog.tsx";
 import {PageSelect} from "./PageSelect.tsx";
@@ -16,6 +16,8 @@ import {PageSelect} from "./PageSelect.tsx";
 interface SidebarContentProps {
     coords: { x: number, y: number };
 }
+
+type ActionKind = NonNullable<CellData["action"]>["kind"] | "none";
 
 const SidebarSection = ({title, title_end, children}: {
     title: string,
@@ -116,14 +118,14 @@ const ConfirmCountdownBar = ({duration_ms}: { duration_ms: number }) => {
     return <span ref={bar_ref} className="absolute bottom-0 left-0 h-1 w-full origin-left bg-current opacity-60"/>;
 }
 const ConfirmSidebarButton = ({
-    children,
-    onConfirm,
-    Icon,
-    className = "",
-    confirm_text = "Sure? Click again to confirm.",
-    hide_icon_on_confirming = true,
-    reset_after_ms = 3000
-}: {
+                                  children,
+                                  onConfirm,
+                                  Icon,
+                                  className = "",
+                                  confirm_text = "Sure? Click again to confirm.",
+                                  hide_icon_on_confirming = true,
+                                  reset_after_ms = 3000
+                              }: {
     children: React.ReactNode,
     onConfirm: () => void,
     Icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>,
@@ -189,13 +191,13 @@ const ControlledHint = ({prop}: { prop: string }) => (
 );
 
 const PluginSection = ({
-    plugin,
-    coords,
-    configurable,
-    has_existing_config,
-    cell,
-    setCellData
-}: {
+                           plugin,
+                           coords,
+                           configurable,
+                           has_existing_config,
+                           cell,
+                           setCellData
+                       }: {
     plugin: ReturnType<typeof unwrap_plugin_reference> | null,
     coords: { x: number, y: number },
     configurable: boolean,
@@ -236,7 +238,11 @@ const PluginSection = ({
     );
 }
 
-const PageSection = ({page_id, onChange}: { page_id: string, onChange: (new_page_id: string) => void }) => {
+/**
+ * Picks the page a link goes to.
+ * @param page_id the linked page, or null while none has been chosen
+ */
+const PageSection = ({page_id, onChange}: { page_id: string | null, onChange: (new_page_id: string) => void }) => {
     const manifest = usePageManifest();
 
     const search_ref = useRef<HTMLInputElement>(null);
@@ -244,22 +250,32 @@ const PageSection = ({page_id, onChange}: { page_id: string, onChange: (new_page
         requestAnimationFrame(() => search_ref.current?.focus());
     }, []);
 
+    const on_select = useCallback((new_page_id: string) => {
+        onChange(new_page_id);
+
+        // closes the dropdown, which is open for as long as something inside it has focus
+        (document.activeElement as HTMLElement | null)?.blur();
+    }, [onChange]);
+
     return (
         <SidebarSection title="Page">
-            <div className="dropdown">
-                <button
-                    type="button"
+            <div className="dropdown w-full">
+                {/* the select class draws the same arrow as a real select. a div, as webkit doesn't focus a clicked button */}
+                <div
                     tabIndex={0}
-                    className="w-full flex h-12 min-w-0 flex-1 cursor-pointer flex-col items-start justify-center rounded-field border border-base-content/20 bg-base-100 px-3 text-left hover:border-base-content/40"
+                    role="button"
+                    className="select select-bordered w-full cursor-pointer"
                     onFocus={on_dropdown_open}
                 >
-                    <span className="w-full truncate text-sm font-medium">{manifest.names[page_id] || page_id}</span>
-                    <span className="w-full truncate font-mono text-xs opacity-60" title={page_id}>{page_id}</span>
-                </button>
+                    {page_id && page_id === manifest.home && <House className="w-4 shrink-0 opacity-60"/>}
+                    <span className={`truncate ${page_id ? "" : "opacity-60"}`}>
+                        {page_id ? manifest.names[page_id] ?? "Deleted page" : "Choose a page..."}
+                    </span>
+                </div>
                 <ul tabIndex={-1} className="dropdown-content w-full bg-base-300">
                     <PageSelect
-                        selected={page_id}
-                        on_select={onChange}
+                        selected={page_id ?? ""}
+                        on_select={on_select}
                         show_create={false}
                         search_ref={search_ref}
                     />
@@ -271,6 +287,8 @@ const PageSection = ({page_id, onChange}: { page_id: string, onChange: (new_page
 
 export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
     const page_id = useEditingPage();
+    const show_page = useShowEditingPage();
+    const manifest = usePageManifest();
     const [cell, setCellData] = useGridCell(page_id, coords.y, coords.x);
 
     const plugin = cell?.action?.kind === "plugin" ? unwrap_plugin_reference(cell.action.plugin) : null;
@@ -285,15 +303,75 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
         }
     }, [cell]);
 
+    // the kind picked in the select. plugin and page aren't saved until one's chosen, so a half-made action never reaches the Pi.
+    // reset when another cell is selected too, as the sidebar stays mounted while switching cells
+    const [chosen_kind, setChosenKind] = useState<ActionKind>(cell?.action?.kind ?? "none");
+    useEffect(() => {
+        setChosenKind(cell?.action?.kind ?? "none");
+    }, [cell?.action?.kind, page_id, coords.x, coords.y]);
+
+    // only offer configuration for plugins that declare settings
+    const plugin_info = usePluginInfo(plugin ? plugin.name : null);
+    const configurable = !!plugin_info?.config_template && Object.keys(plugin_info.config_template).length > 0;
+
+    // still allow editing if the cell already has config, e.g. from before a plugin dropped its template, so it can be cleared
+    const has_existing_config = !!plugin && Object.keys(plugin.config).length > 0;
+
+    const change_action_kind = useCallback(async (new_kind: ActionKind) => {
+        if (!cell) {
+            return;
+        }
+
+        // settings can take effort to set up, unlike a link, so make sure they're not lost by accident
+        if (plugin && has_existing_config && new_kind !== "plugin") {
+            const confirmed = await show_confirm({
+                title: "Remove plugin?",
+                message: `This button's ${plugin_info?.display_name ?? plugin.name} settings will be lost.`,
+                confirm_label: "Remove",
+                tone: "danger"
+            });
+
+            if (!confirmed) {
+                return;
+            }
+        }
+
+        setChosenKind(new_kind);
+
+        switch (new_kind) {
+            case "none":
+                setCellData({...cell, action: undefined});
+                break;
+            case "home":
+            case "back":
+                setCellData({...cell, action: {kind: new_kind}});
+                break;
+            // plugin and page are saved by their pickers
+        }
+    }, [cell, plugin, plugin_info, has_existing_config, setCellData]);
+
     const channel = useChannel();
     const simulate_button_push = useCallback(
         () => {
-            if (!cell) {
+            const action = cell?.action;
+
+            if (!action) {
                 return;
             }
 
-            if (!plugin) {
-                show_alert("No plugin configured for this button.");
+            // following a link on the server would move the editor's connection to another page while the editor stays
+            // on this one, so the editor follows it itself
+            if (action.kind === "page") {
+                if (manifest.order.includes(action.id)) {
+                    show_page(action.id);
+                } else {
+                    show_alert("The page this button goes to has been deleted.");
+                }
+                return;
+            }
+
+            if (action.kind === "home") {
+                show_page(manifest.home);
                 return;
             }
 
@@ -309,8 +387,12 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
                 show_alert("Not connected to the server.");
             }
         },
-        [cell, plugin, channel, coords]
+        [cell, manifest, show_page, channel, coords]
     );
+
+    // back follows the device's own history, which the editor doesn't have
+    const can_simulate = cell?.action !== undefined && cell.action.kind !== "back"
+        && (cell.action.kind !== "plugin" || plugin_info?.pushable !== false);
 
     const delete_button = useCallback(
         () => {
@@ -322,13 +404,6 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
         },
         [cell, page_id, coords]
     );
-
-    // only offer configuration for plugins that declare settings
-    const plugin_info = usePluginInfo(plugin ? plugin.name : null);
-    const configurable = !!plugin_info?.config_template && Object.keys(plugin_info.config_template).length > 0;
-
-    // still allow editing if the cell already has config, e.g. from before a plugin dropped its template, so it can be cleared
-    const has_existing_config = !!plugin && Object.keys(plugin.config).length > 0;
 
     // fields a live plugin sets itself, so editing them here would have no visible effect
     const live_controls = new Set(plugin_info?.live_controls ?? []);
@@ -407,43 +482,12 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
             )}
 
             <SidebarSection title="Action">
-                <select className="select select-bordered w-full" aria-label="Action type" onChange={e => {
-                    const new_action = e.target.value;
-
-                    switch (new_action) {
-                        case "none":
-                            setCellData({
-                                ...cell,
-                                action: undefined
-                            });
-                            break;
-                        case "plugin":
-                            setCellData({
-                                ...cell,
-                                action: {kind: "plugin", plugin: {name: "", config: undefined}}
-                            });
-                            break;
-                        case "page":
-                            setCellData({
-                                ...cell,
-                                action: {kind: "page", id: ""}
-                            });
-                            break;
-                        case "home":
-                            setCellData({
-                                ...cell,
-                                action: {kind: "home"}
-                            });
-                            break;
-                        case "back":
-                            setCellData({
-                                ...cell,
-                                action: {kind: "back"}
-                            });
-                            break;
-                    }
-                }}
-                value={cell.action?.kind ?? "none"}>
+                <select
+                    className="select select-bordered w-full"
+                    aria-label="Action type"
+                    value={chosen_kind}
+                    onChange={e => change_action_kind(e.target.value as ActionKind)}
+                >
                     <option value="none">None</option>
                     <option value="plugin">Run plugin</option>
                     <option value="page">Go to page</option>
@@ -452,7 +496,7 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
                 </select>
             </SidebarSection>
 
-            {cell.action?.kind === "plugin" && (
+            {chosen_kind === "plugin" && (
                 <PluginSection
                     plugin={plugin}
                     coords={coords}
@@ -463,13 +507,16 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
                 />
             )}
 
-            {cell.action?.kind === "page" && (
-                <PageSection page_id={cell.action.id} onChange={new_page_id => {
-                    setCellData({
-                        ...cell,
-                        action: {kind: "page", id: new_page_id}
-                    });
-                }}/>
+            {chosen_kind === "page" && (
+                <PageSection
+                    page_id={cell.action?.kind === "page" ? cell.action.id : null}
+                    onChange={new_page_id => {
+                        setCellData({
+                            ...cell,
+                            action: {kind: "page", id: new_page_id}
+                        });
+                    }}
+                />
             )}
 
             <SidebarSection title="Background">
@@ -501,9 +548,9 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
             </SidebarSection>
 
             <div className="mt-auto mb-12 flex flex-col gap-2">
-                {plugin_info?.pushable !== false && (
+                {can_simulate && (
                     <SidebarButton onClick={simulate_button_push} Icon={MousePointerClick} className="btn-primary">
-                        Simulate button push
+                        {cell.action?.kind === "page" || cell.action?.kind === "home" ? "Follow link" : "Simulate button push"}
                     </SidebarButton>
                 )}
 
