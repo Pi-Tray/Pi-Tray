@@ -152,6 +152,10 @@ jobs:
           echo "paths<<EOF" >> "$GITHUB_OUTPUT"
           echo '${{ steps.tauri-build.outputs.artifactPaths }}' | jq -r '.[]' | while IFS= read -r artifact; do
             case "$artifact" in
+              # the updater archive below holds it, and uploading the folder would let files from inside it into the release
+              *.app)
+                continue
+                ;;
               *.app.tar.gz|*.app.tar.gz.sig)
                 renamed="$(dirname "$artifact")/$(basename "$artifact" | sed "s/\.app\.tar\.gz/_${arch}.app.tar.gz/")"
                 mv "$artifact" "$renamed"
