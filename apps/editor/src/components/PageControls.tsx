@@ -152,7 +152,7 @@ const PageMoreControls = ({
             <ul tabIndex={-1} className="dropdown-content menu bg-base-200 rounded-box z-1 w-56 p-2 shadow-sm">
                 {name_input_ref && name_input_ref.current && (
                     <li>
-                        <a onClick={() => name_input_ref.current.focus()}>
+                        <a onClick={() => name_input_ref.current!.focus()}>
                             <Pencil className="w-4" /> Rename
                         </a>
                     </li>

@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {usePluginInfo} from "../util/plugins.ts";
-import {Activity, House, ImageIcon, MousePointerClick, Plus, Settings, Trash, X} from "lucide-react";
+import {Activity, ChevronRight, House, ImageIcon, MousePointerClick, Plus, Settings, Trash, X} from "lucide-react";
 import {PluginPickerDialog} from "./PluginPickerDialog.tsx";
 import {CustomDynamicIcon} from "@pi-tray/ui/CustomDynamicIcon";
 import {IconPickerDialog} from "./IconPicker.tsx";
@@ -38,7 +38,7 @@ const PluginSelect = ({
                           onChange
                       }: {
     value: string | null;
-    onChange: (new_value: string | null) => void;
+    onChange: (new_value: string) => void;
 }) => {
     const [picker_open, setPickerOpen] = useState(false);
     const close_picker = useCallback(() => setPickerOpen(false), []);
@@ -52,26 +52,23 @@ const PluginSelect = ({
                 <button
                     type="button"
                     onClick={() => setPickerOpen(true)}
-                    className="flex h-12 min-w-0 flex-1 cursor-pointer flex-col items-start justify-center rounded-field border border-base-content/20 bg-base-100 px-3 text-left hover:border-base-content/40"
+                    className="flex h-12 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-field border border-base-content/20 bg-base-100 px-3 text-left hover:border-base-content/40"
                 >
-                    {value ? (
-                        <>
-                            <span className="w-full truncate text-sm font-medium">
-                                {plugin_info === undefined ? "Loading..." : plugin_info?.display_name || value.slice(value.lastIndexOf("/") + 1)}
-                            </span>
-                            <span className="w-full truncate font-mono text-xs opacity-60" title={value}>{value}</span>
-                        </>
-                    ) : (
-                        <span className="text-sm opacity-60">Choose a plugin...</span>
-                    )}
-                </button>
+                    <span className="flex min-w-0 flex-1 flex-col">
+                        {value ? (
+                            <>
+                                <span className="w-full truncate text-sm font-medium">
+                                    {plugin_info === undefined ? "Loading..." : plugin_info?.display_name || value.slice(value.lastIndexOf("/") + 1)}
+                                </span>
+                                <span className="w-full truncate font-mono text-xs opacity-60" title={value}>{value}</span>
+                            </>
+                        ) : (
+                            <span className="text-sm opacity-60">Choose a plugin...</span>
+                        )}
+                    </span>
 
-                {value && (
-                    <button type="button" className="btn btn-ghost btn-sm btn-square" title="Remove plugin"
-                            onClick={() => onChange(null)}>
-                        <X className="w-4 h-4"/>
-                    </button>
-                )}
+                    <ChevronRight className="w-4 shrink-0 opacity-60" />
+                </button>
             </div>
 
             {value && plugin_info === null && (
@@ -210,19 +207,10 @@ const PluginSection = ({
     return (
         <SidebarSection title="Plugin">
             <PluginSelect value={plugin ? plugin.name : null} onChange={new_plugin_name => {
-                if (new_plugin_name === null) {
-                    // remove plugin
-                    setCellData({
-                        ...cell,
-                        action: undefined
-                    });
-                } else {
-                    // set new plugin, with no config
-                    setCellData({
-                        ...cell,
-                        action: {kind: "plugin", plugin: {name: new_plugin_name, config: undefined}}
-                    });
-                }
+                setCellData({
+                    ...cell,
+                    action: {kind: "plugin", plugin: {name: new_plugin_name, config: undefined}}
+                });
             }}/>
 
             {plugin && (configurable || has_existing_config) && (
