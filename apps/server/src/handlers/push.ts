@@ -1,7 +1,7 @@
 import type {CellAction, MessageHandler} from "../types";
 import type {Client} from "../clients";
 
-import {get_page, home_page_for, home_page_id, page_exists} from "../pages";
+import {get_page, home_page_for, home_page_id, page_exists, get_page_name} from "../pages";
 import {set_device_page} from "../paired_devices";
 import {load_plugin} from "../plugins";
 import {unwrap_plugin_reference} from "../types";
@@ -79,6 +79,10 @@ export default (async (client, payload) => {
             await plugin_context.run({kind: "push", plugin_name, x: payload.x, y: payload.y}, () => handle_push({
                 x: payload.x,
                 y: payload.y,
+                page: {
+                    id: client.current_page,
+                    name: get_page_name(client.current_page) ?? ""
+                },
                 config: plugin_config,
                 ws: client.as_plugin_socket(),
                 data_dir

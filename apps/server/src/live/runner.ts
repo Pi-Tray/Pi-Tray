@@ -1,6 +1,6 @@
 import {Plugin, PluginConfig, PLUGIN_LIVE_CONTROL_FIELDS, unwrap_plugin_reference} from "../types";
 
-import {add_pages_change_listener, get_manifest, get_page} from "../pages";
+import {add_pages_change_listener, get_manifest, get_page, get_page_name} from "../pages";
 import {
     add_plugin_cache_cleared_listener,
     add_plugin_stop_listener,
@@ -245,6 +245,10 @@ const start_tile = (key: string, desired: DesiredTile) => {
 
             x: desired.col_idx,
             y: desired.row_idx,
+            page: {
+                id: desired.page_id,
+                name: get_page_name(desired.page_id) ?? ""
+            },
 
             data_dir
         }));
