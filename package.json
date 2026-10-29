@@ -1,7 +1,7 @@
 {
     "name": "pi-tray",
     "private": true,
-    "version": "0.5.0",
+    "version": "0.5.1",
     "scripts": {
         "build": "pnpm -r build",
         "dev": "pnpm -r --parallel --stream run dev",
