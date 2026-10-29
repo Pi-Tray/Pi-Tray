@@ -489,10 +489,10 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
                     onChange={e => change_action_kind(e.target.value as ActionKind)}
                 >
                     <option value="none">None</option>
-                    <option value="plugin">Run plugin</option>
-                    <option value="page">Go to page</option>
-                    <option value="home">Go to home page</option>
-                    <option value="back">Go back</option>
+                    <option value="plugin">🧩 Run plugin</option>
+                    <option value="page">📜 Go to page</option>
+                    <option value="home">🏠 Go to home page</option>
+                    <option value="back">↩ Return to previous page</option>
                 </select>
             </SidebarSection>
 
