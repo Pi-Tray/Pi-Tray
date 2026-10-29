@@ -1,7 +1,16 @@
-import {create_page, rename_page, usePageManifest} from "../util/pages.ts";
+import {
+    create_page,
+    delete_page,
+    duplicate_page,
+    move_page,
+    rename_page,
+    set_home_page,
+    usePageManifest
+} from "../util/pages.ts";
 import {search_pages} from "../util/page_search.ts";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
-import {Check, ChevronDown, House, Plus, Search} from "lucide-react";
+import {ArrowDown, ArrowUp, Check, ChevronDown, Copy, Ellipsis, House, Plus, Search, Trash} from "lucide-react";
+import {show_confirm} from "../util/dialogs.ts";
 
 export const PageControls = ({selected, show_page}: {selected: string, show_page: (id: string) => void}) => {
     const manifest = usePageManifest();
@@ -101,7 +110,7 @@ export const PageControls = ({selected, show_page}: {selected: string, show_page
     }, []);
 
     return (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
             <label className="inline-grid min-w-0 max-w-full">
                 {/* invisible copy of the name, which sizes the cell the input fills. same classes, so the same width */}
                 <span
@@ -168,10 +177,88 @@ export const PageControls = ({selected, show_page}: {selected: string, show_page
                     </li>
                 </ul>
             </div>
+
+            <PageMoreControls
+                selected={selected}
+                saved_name={saved_name}
+                on_page_click={on_page_click}
+                close_dropdown={close_dropdown}
+                on_deleted={() => setLocalName("")}
+            />
         </div>
     );
 }
 
-// TODO: delete
-// TODO: reorder
-// TODO: assign home
+const PageMoreControls = ({
+    selected,
+    saved_name,
+    on_page_click,
+    close_dropdown,
+    on_deleted
+}: {
+    selected: string,
+    saved_name: string,
+    on_page_click: (id: string) => void,
+    close_dropdown: () => void
+    on_deleted: () => void
+}) => {
+    const manifest = usePageManifest();
+
+    const is_home = selected === manifest.home;
+    const position = manifest.order.indexOf(selected);
+
+    const on_delete = useCallback(() => {
+        show_confirm({
+            title: "Delete page?",
+            message: `Are you sure you want to delete "${saved_name}"? This cannot be undone.`,
+            confirm_label: "Delete",
+            cancel_label: "Cancel",
+            tone: "danger"
+        }).then((confirmed) => {
+            if (confirmed) {
+                delete_page(selected);
+                close_dropdown();
+
+                on_deleted();
+            }
+        });
+    }, [saved_name, selected]);
+
+    return (
+        <div className="dropdown">
+            <div tabIndex={0} role="button" className="btn btn-ghost btn-square" title="Page options"><Ellipsis /></div>
+            <ul tabIndex={-1} className="dropdown-content menu bg-base-200 rounded-box z-1 w-56 p-2 shadow-sm">
+                <li className={is_home ? "menu-disabled" : ""}>
+                    <a onClick={() => { set_home_page(selected); close_dropdown(); }}>
+                        <House className="w-4" /> {is_home ? "This is the home page" : "Set as home"}
+                    </a>
+                </li>
+                <li>
+                    <a onClick={() => duplicate_page(selected).then(on_page_click)}>
+                        <Copy className="w-4" /> Duplicate
+                    </a>
+                </li>
+                {/*<li className={position === 0 ? "menu-disabled" : ""}>*/}
+                {/*    <a onClick={() => move_page(selected, position - 1)}><ArrowUp className="w-4" /> Move earlier</a>*/}
+                {/*</li>*/}
+                {/*<li className={position === manifest.order.length - 1 ? "menu-disabled" : ""}>*/}
+                {/*    <a onClick={() => move_page(selected, position + 1)}><ArrowDown className="w-4" /> Move later</a>*/}
+                {/*</li>*/}
+
+                <div className="divider m-0" />
+
+                <li className={is_home ? "menu-disabled" : ""}>
+                    <a className={is_home ? "" : "text-error"} onClick={() => { close_dropdown(); on_delete(); }}>
+                        <Trash className="w-4" /> Delete page
+                    </a>
+                    {is_home && <span className="text-xs opacity-60 pointer-events-none">Make another page home first</span>}
+                </li>
+            </ul>
+        </div>
+    );
+}
+
+// TODO: if reorder matters then re-enable, if not remove and add sorting (date, alpha, uses, etc)
+// TODO: per device home assignment
+// TODO: is it worth adding morecontrols to search results for quicker delete/dupe?
+// TODO: assigning links between pages in sidebar (use select for action type ig?)
