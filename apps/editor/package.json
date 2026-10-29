@@ -12,6 +12,7 @@
     },
     "dependencies": {
         "@fontsource-variable/dm-sans": "^5.2.6",
+        "@leeoniya/ufuzzy": "^1.0.19",
         "@pi-tray/package-spec": "workspace:*",
         "@pi-tray/secure-channel": "workspace:*",
         "@pi-tray/server-config": "workspace:*",

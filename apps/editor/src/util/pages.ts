@@ -213,6 +213,25 @@ const save_page = async (page_id: string, cells: PageCells) => {
 }
 
 /**
+ * The name, or the name with the lowest number after it that no other page has, e.g. "New page 2".
+ * Compared ignoring case, as "new page" and "New page" would look the same in the list.
+ */
+const unique_page_name = (name: string): string => {
+    const taken = new Set(Object.values(manifest.names).map((existing) => existing.toLowerCase()));
+
+    if (!taken.has(name.toLowerCase())) {
+        return name;
+    }
+
+    let number = 2;
+    while (taken.has(`${name} ${number}`.toLowerCase())) {
+        number++;
+    }
+
+    return `${name} ${number}`;
+}
+
+/**
  * Adds an empty page after the others.
  * @returns the new page's id
  */
@@ -221,7 +240,7 @@ export const create_page = (name = NEW_PAGE_NAME): Promise<string> => queue_writ
 
     // the file first, so the server never sees a page in the manifest without its file
     await save_page(page_id, {});
-    await save_manifest({...manifest, order: [...manifest.order, page_id], names: {...manifest.names, [page_id]: name}});
+    await save_manifest({...manifest, order: [...manifest.order, page_id], names: {...manifest.names, [page_id]: unique_page_name(name)}});
 
     return page_id;
 });
@@ -236,7 +255,7 @@ export const duplicate_page = (source_id: string): Promise<string> => queue_writ
     order.splice(order.indexOf(source_id) + 1, 0, page_id);
 
     await save_page(page_id, structuredClone(pages.get(source_id) ?? {}));
-    await save_manifest({...manifest, order, names: {...manifest.names, [page_id]: `${manifest.names[source_id] ?? UNNAMED_PAGE_NAME} copy`}});
+    await save_manifest({...manifest, order, names: {...manifest.names, [page_id]: unique_page_name(`${manifest.names[source_id] ?? UNNAMED_PAGE_NAME} copy`)}});
 
     return page_id;
 });
