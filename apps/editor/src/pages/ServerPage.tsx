@@ -8,6 +8,8 @@ import {ServerConfigForm} from "../components/ServerConfigForm.tsx";
 import {show_confirm} from "../util/dialogs.ts";
 import {editor_version} from "../version.ts";
 
+const dev_build = import.meta.env.DEV;
+
 interface ServerSummary {
     text: string;
 
@@ -169,18 +171,21 @@ export const ServerPage = () => {
             <div className="flex flex-col gap-4">
                 <h2 className="text-xl font-bold">Actions</h2>
 
+                {dev_build && (
+                    <p className="text-sm opacity-70">Dev build: the server is run by <code>pnpm dev</code>, so these would control your installed copy instead.</p>
+                )}
                 <div className="flex gap-4">
                     <div className="join">
                         <button
                             className="btn join-item"
-                            disabled={busy || !supervisor_running}
+                            disabled={dev_build || busy || !supervisor_running}
                             onClick={confirm_stop}
                         >
                             <Circle className="mr-2" /> Stop
                         </button>
                         <button
                             className="btn join-item"
-                            disabled={busy || server_up}
+                            disabled={dev_build || busy || server_up}
                             onClick={() => void run(supervisor.start)}
                         >
                             <Tally1 /> Start
@@ -189,7 +194,7 @@ export const ServerPage = () => {
 
                     <button
                         className="btn"
-                        disabled={busy || !supervisor_running}
+                        disabled={dev_build || busy || !supervisor_running}
                         onClick={() => void run(() => supervisor.run_action("restart"))}
                     >
                         <RotateCcw className="mr-2" /> Restart

@@ -113,7 +113,7 @@ export const StatusToast = () => {
     // so the user hasn't configured the server address yet
     const channel_configured = channel !== null;
 
-    const {text, status_class, show_pinger} = custom_address
+    const {text, status_class, show_pinger} = custom_address || import.meta.env.DEV
         ? describe_channel(channel_configured, displayed_channel_status)
         : describe_server(connection, server, channel_configured, displayed_channel_status, starting);
 
