@@ -5,8 +5,8 @@ import {
     set_home_page,
     usePageManifest
 } from "../util/pages.ts";
-import {useCallback, useEffect, useRef, useState} from "react";
-import {ChevronDown, Copy, Ellipsis, House, Trash} from "lucide-react";
+import {RefObject, useCallback, useEffect, useRef, useState} from "react";
+import {ChevronDown, Copy, Ellipsis, House, Pencil, Trash} from "lucide-react";
 import {show_confirm} from "../util/dialogs.ts";
 import {PageSelect} from "./PageSelect.tsx";
 
@@ -60,6 +60,8 @@ export const PageControls = ({selected, show_page}: {selected: string, show_page
         close_dropdown();
     }, [show_page, close_dropdown]);
 
+    const name_input_ref = useRef<HTMLInputElement>(null);
+
     return (
         <div className="flex items-center gap-1">
             <label className="inline-grid min-w-0 max-w-full">
@@ -72,6 +74,7 @@ export const PageControls = ({selected, show_page}: {selected: string, show_page
                 </span>
 
                 <input
+                    ref={name_input_ref}
                     size={1}
                     className="input input-ghost text-2xl font-bold [grid-area:1/1] w-full min-w-0"
                     aria-label="Page name"
@@ -100,6 +103,7 @@ export const PageControls = ({selected, show_page}: {selected: string, show_page
                 on_page_click={on_page_click}
                 close_dropdown={close_dropdown}
                 on_deleted={() => setLocalName("")}
+                name_input_ref={name_input_ref}
             />
         </div>
     );
@@ -110,13 +114,15 @@ const PageMoreControls = ({
     saved_name,
     on_page_click,
     close_dropdown,
-    on_deleted
+    on_deleted,
+    name_input_ref
 }: {
     selected: string,
     saved_name: string,
     on_page_click: (id: string) => void,
-    close_dropdown: () => void
-    on_deleted: () => void
+    close_dropdown: () => void,
+    on_deleted: () => void,
+    name_input_ref?: RefObject<HTMLInputElement | null>
 }) => {
     const manifest = usePageManifest();
 
@@ -144,6 +150,13 @@ const PageMoreControls = ({
         <div className="dropdown">
             <div tabIndex={0} role="button" className="btn btn-ghost btn-square" title="Page options"><Ellipsis /></div>
             <ul tabIndex={-1} className="dropdown-content menu bg-base-200 rounded-box z-1 w-56 p-2 shadow-sm">
+                {name_input_ref && name_input_ref.current && (
+                    <li>
+                        <a onClick={() => name_input_ref.current.focus()}>
+                            <Pencil className="w-4" /> Rename
+                        </a>
+                    </li>
+                )}
                 <li className={is_home ? "menu-disabled" : ""}>
                     <a onClick={() => { set_home_page(selected); close_dropdown(); }}>
                         <House className="w-4" /> {is_home ? "This is the home page" : "Set as home"}
