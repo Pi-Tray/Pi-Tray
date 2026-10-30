@@ -91,3 +91,19 @@
         color: #fff;
     }
 }
+
+.dim_bg {
+    isolation: isolate;
+    background-clip: padding-box;
+}
+
+.dim_bg::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-color: inherit;
+    opacity: 0.66; /* image shows at 33% */
+    border-radius: inherit;
+    pointer-events: none;
+}

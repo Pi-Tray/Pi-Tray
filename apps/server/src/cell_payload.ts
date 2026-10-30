@@ -51,6 +51,7 @@ export const build_cell_payload = (page_id: string, col_idx: number, row_idx: nu
         is_icon: cell?.text_is_icon || false,
         // resolved here as clients don't know the file's extension or version
         background: resolve_asset_url(cell?.background),
+        dim_bg: cell?.dim_bg,
         pushable: is_pushable(cell)
     };
 }

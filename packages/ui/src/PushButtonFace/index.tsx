@@ -14,6 +14,7 @@ export interface PushButtonDisplay {
 
     /** Any url an image can load from, e.g. an object url or a file preview, or null for none */
     background_url: string | null;
+    dim_bg?: boolean;
 
     /** Missing counts as pushable */
     pushable?: boolean;
@@ -71,7 +72,8 @@ export const PushButtonFace = memo(({display, state = null, highlighted = false,
         styles.element,
         state ? STATE_CLASSES[state] : "",
         highlighted ? styles.highlighted : "",
-        className ?? ""
+        className ?? "",
+        content && display?.dim_bg !== false ? styles.dim_bg : ""
     ].filter(Boolean).join(" ");
 
     return (

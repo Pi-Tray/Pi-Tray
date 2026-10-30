@@ -87,10 +87,11 @@ interface PushButtonProps {
  */
 export const PushButton = memo(({x, y, cell, state, on_push, className}: PushButtonProps) => {
     const background_url = useAssetUrl(cell?.background ?? null);
+    console.log(cell)
 
     const display = useMemo<PushButtonDisplay | null>(
-        () => cell ? {text: cell.text, text_is_icon: cell.is_icon, background_url: background_url || null, pushable: cell.pushable} : null,
-        [cell, background_url]
+        () => cell ? {text: cell.text, text_is_icon: cell.is_icon, background_url: background_url || null, dim_bg: cell.dim_bg, pushable: cell.pushable} : null,
+        [cell, cell?.text, cell?.is_icon, background_url, cell?.dim_bg, cell?.pushable]
     );
 
     const handle_click = useCallback(() => {

@@ -14,6 +14,7 @@ export interface CellPayload {
      * Relative, so clients resolve it against the address they connected to.
      */
     background: string | null;
+    dim_bg?: boolean;
 
     /**
      * Whether pressing the cell does anything. Missing from older servers, so treat missing as true.

@@ -35,9 +35,10 @@ export const PushButton = ({x, y, on_click, highlighted, className}: PushButtonP
     const background_asset = useAsset(cell?.background);
 
     const display = useMemo<PushButtonDisplay | null>(
-        () => cell ? {text: cell.text || "", text_is_icon: cell.text_is_icon || false, background_url: background_asset?.preview_url ?? null} : null,
-        [cell?.text, cell?.text_is_icon, background_asset?.preview_url]
+        () => cell ? {text: cell.text || "", text_is_icon: cell.text_is_icon || false, background_url: background_asset?.preview_url ?? null, dim_bg: cell.dim_bg} : null,
+        [cell?.text, cell?.text_is_icon, background_asset?.preview_url, cell?.dim_bg]
     );
+    console.log(display)
 
     const handle_click = useCallback(() => on_click?.(x, y), [on_click, x, y]);
 

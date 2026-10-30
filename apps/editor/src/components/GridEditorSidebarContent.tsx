@@ -34,9 +34,9 @@ const SidebarSection = ({title, title_end, children}: {
     </section>
 );
 const PluginSelect = ({
-                          value,
-                          onChange
-                      }: {
+    value,
+    onChange
+}: {
     value: string | null;
     onChange: (new_value: string) => void;
 }) => {
@@ -115,14 +115,14 @@ const ConfirmCountdownBar = ({duration_ms}: { duration_ms: number }) => {
     return <span ref={bar_ref} className="absolute bottom-0 left-0 h-1 w-full origin-left bg-current opacity-60"/>;
 }
 const ConfirmSidebarButton = ({
-                                  children,
-                                  onConfirm,
-                                  Icon,
-                                  className = "",
-                                  confirm_text = "Sure? Click again to confirm.",
-                                  hide_icon_on_confirming = true,
-                                  reset_after_ms = 3000
-                              }: {
+    children,
+    onConfirm,
+    Icon,
+    className = "",
+    confirm_text = "Sure? Click again to confirm.",
+    hide_icon_on_confirming = true,
+    reset_after_ms = 3000
+}: {
     children: React.ReactNode,
     onConfirm: () => void,
     Icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>,
@@ -188,13 +188,13 @@ const ControlledHint = ({prop}: { prop: string }) => (
 );
 
 const PluginSection = ({
-                           plugin,
-                           coords,
-                           configurable,
-                           has_existing_config,
-                           cell,
-                           setCellData
-                       }: {
+    plugin,
+    coords,
+    configurable,
+    has_existing_config,
+    cell,
+    setCellData
+}: {
     plugin: ReturnType<typeof unwrap_plugin_reference> | null,
     coords: { x: number, y: number },
     configurable: boolean,
@@ -533,6 +533,16 @@ export const GridEditorSidebarContent = ({coords}: SidebarContentProps) => {
                         />
                     </>
                 ) : <ControlledHint prop="Background"/>}
+
+                <label className="label text-xs ml-auto mr-auto">
+                    Dim when label is present
+                    <input
+                        type="checkbox"
+                        className="toggle ml-2"
+                        checked={cell.dim_bg !== false}
+                        onChange={e => setCellData({...cell, dim_bg: e.target.checked})}
+                    />
+                </label>
             </SidebarSection>
 
             <div className="mt-auto mb-12 flex flex-col gap-2">

@@ -2850,7 +2850,7 @@ dependencies = [
 
 [[package]]
 name = "pi-tray-editor"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "serde",
  "serde_json",

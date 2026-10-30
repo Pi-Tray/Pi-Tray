@@ -89,7 +89,7 @@ export const GridEditorPage = () => {
                 </div>
 
                 <aside className={`h-full flex flex-col fixed top-0 right-0 w-75 overflow-y-auto bg-base-200 border-l border-l-base-300 p-4 transition-transform ${!selected_button && "translate-x-full"}`}>
-                    <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center justify-between sticky top-0 bg-base-200 z-10 mb-2 pb-2">
                         <h3 className="font-semibold">Configure cell</h3>
 
                         <button title="Close configure cell sidebar" onClick={close_sidebar} className="cursor-pointer">

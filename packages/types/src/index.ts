@@ -46,6 +46,7 @@ export type CellAction =
  * @param text_is_icon whether the text should be treated as a Lucide icon name (default: false)
  * @param action the action to perform when the cell is pushed (default: none)
  * @param background relative asset URL for the background image to use for the cell (default: no background)
+ * @param dim_bg whether to dim the background image when there is a label (default: true)
  */
 export interface CellData {
     text?: string;
@@ -54,6 +55,7 @@ export interface CellData {
     action?: CellAction;
 
     background?: string;
+    dim_bg?: boolean;
 }
 
 export type PageCells = { [row_idx: number]: { [col_idx: number]: CellData } };
