@@ -60,9 +60,13 @@ export interface CellData {
 
 export type PageCells = { [row_idx: number]: { [col_idx: number]: CellData } };
 
+export type PageTitle = "left" | "center" | "right" | "none";
+
 export interface PageData {
     row_data: PageCells;
+    title?: PageTitle;
 }
+export type PageSettings = Omit<PageData, "row_data">;
 
 export interface GridShape {
     rows: number;

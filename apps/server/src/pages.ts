@@ -1,6 +1,6 @@
 import fs from "fs";
 
-import type {CellData, GridShape, PageCells, PageManifest, PluginReference} from "./types";
+import type {CellData, GridShape, PageCells, PageData, PageManifest, PageSettings, PluginReference} from "./types";
 import {PAGE_ID_PATTERN, DEFAULT_GRID_SHAPE} from "./types";
 import {data_dir, in_data_dir} from "@pi-tray/paths";
 
@@ -147,21 +147,28 @@ const read_manifest = (): PageManifest | null => {
     return {home, order, names, shape: is_valid_shape(raw.shape) ? raw.shape : DEFAULT_GRID_SHAPE};
 }
 
+const EMPTY_PAGE: PageData = {row_data: {}};
+
 /**
- * Reads a page's cells.
- * @returns its cells, empty if the file is missing, or null if it can't be parsed, e.g. it's mid-write
+ * Reads a page's cells and settings.
+ * @returns the page, empty if the file is missing, or null if it can't be parsed, e.g. it's mid-write
  */
-const read_page = (page_id: string): PageCells | null => {
+const read_page = (page_id: string): PageData | null => {
     const file_path = page_file_path(page_id);
 
     if (!fs.existsSync(file_path)) {
         console.warn(`The page ${page_id} has no file at ${file_path}, so it's empty`);
-        return {};
+        return EMPTY_PAGE;
     }
 
     try {
         const parsed = JSON.parse(fs.readFileSync(file_path, "utf-8"));
-        return parsed?.row_data && typeof parsed.row_data === "object" ? parsed.row_data : {};
+
+        if (!parsed || typeof parsed !== "object") {
+            return EMPTY_PAGE;
+        }
+
+        return {...parsed, row_data: parsed.row_data && typeof parsed.row_data === "object" ? parsed.row_data : {}};
     } catch (error) {
         console.warn(`Couldn't read ${file_path}:`, error instanceof Error ? error.message : error);
         return null;
@@ -178,10 +185,12 @@ let manifest: PageManifest = read_manifest() ?? {
     shape: DEFAULT_GRID_SHAPE
 };
 
-const pages = new Map<string, PageCells>();
+const pages = new Map<string, PageData>();
 for (const page_id of manifest.order) {
-    pages.set(page_id, read_page(page_id) ?? {});
+    pages.set(page_id, read_page(page_id) ?? EMPTY_PAGE);
 }
+
+const settings_of = ({row_data: _row_data, ...settings}: PageData): PageSettings => settings;
 
 console.log(`Loaded ${pages.size} page(s), ${manifest.shape.rows}x${manifest.shape.cols}`);
 
@@ -206,7 +215,15 @@ export const page_exists = (page_id: string): boolean => pages.has(page_id);
  * A page's cells, or undefined if there's no such page.<br>
  * Ids from messages or cell links are only ever looked up here, never used to open a file.
  */
-export const get_page = (page_id: string): PageCells | undefined => pages.get(page_id);
+export const get_page = (page_id: string): PageCells | undefined => pages.get(page_id)?.row_data;
+
+/**
+ * A page's settings, e.g. where devices show its name, or undefined if there's no such page.
+ */
+export const get_page_settings = (page_id: string): PageSettings | undefined => {
+    const page = pages.get(page_id);
+    return page && settings_of(page);
+}
 
 export const get_page_name = (page_id: string): string | undefined => pages.has(page_id) ? manifest.names[page_id] : undefined;
 
@@ -215,7 +232,7 @@ export const get_page_name = (page_id: string): string | undefined => pages.has(
 export type PagesChange =
     | {kind: "shape"}
     | {kind: "cell", page: string, row_idx: number, col_idx: number}
-    | {kind: "page_added" | "page_removed" | "page_renamed", page: string}
+    | {kind: "page_added" | "page_removed" | "page_renamed" | "page_settings_changed", page: string}
     | {kind: "home_changed"};
 
 export type PagesChangeListener = (changes: PagesChange[]) => void | Promise<void>;
@@ -290,7 +307,7 @@ const reload_manifest = () => {
 
     for (const page_id of new_manifest.order) {
         if (!old_manifest.order.includes(page_id)) {
-            pages.set(page_id, read_page(page_id) ?? {});
+            pages.set(page_id, read_page(page_id) ?? EMPTY_PAGE);
             changes.push({kind: "page_added", page: page_id});
         } else if (old_manifest.names[page_id] !== new_manifest.names[page_id]) {
             changes.push({kind: "page_renamed", page: page_id});
@@ -310,16 +327,22 @@ const reload_page = (page_id: string) => {
         return;
     }
 
-    const new_cells = read_page(page_id);
+    const new_page = read_page(page_id);
 
-    if (!new_cells) {
+    if (!new_page) {
         return;
     }
 
-    const old_cells = pages.get(page_id) ?? {};
-    pages.set(page_id, new_cells);
+    const old_page = pages.get(page_id) ?? EMPTY_PAGE;
+    pages.set(page_id, new_page);
 
-    notify(diff_cells(page_id, old_cells, new_cells));
+    const changes = diff_cells(page_id, old_page.row_data, new_page.row_data);
+
+    if (JSON.stringify(settings_of(old_page)) !== JSON.stringify(settings_of(new_page))) {
+        changes.push({kind: "page_settings_changed", page: page_id});
+    }
+
+    notify(changes);
 }
 
 const reload_timers = new Map<string, ReturnType<typeof setTimeout>>();

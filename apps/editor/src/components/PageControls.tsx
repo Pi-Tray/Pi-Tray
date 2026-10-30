@@ -6,9 +6,10 @@ import {
     usePageManifest
 } from "../util/pages.ts";
 import {RefObject, useCallback, useEffect, useRef, useState} from "react";
-import {ChevronDown, Copy, Ellipsis, House, Pencil, Trash} from "lucide-react";
+import {ChevronDown, Copy, Ellipsis, House, Pencil, Settings, Trash} from "lucide-react";
 import {show_confirm} from "../util/dialogs.ts";
 import {PageSelect} from "./PageSelect.tsx";
+import {PageConfigDialog} from "./PageConfigDialog.tsx";
 
 export const PageControls = ({selected, show_page}: {selected: string, show_page: (id: string) => void}) => {
     const manifest = usePageManifest();
@@ -146,44 +147,56 @@ const PageMoreControls = ({
         });
     }, [saved_name, selected]);
 
+    const [show_config, setShowConfig] = useState(false);
+
     return (
-        <div className="dropdown">
-            <div tabIndex={0} role="button" className="btn btn-ghost btn-square" title="Page options"><Ellipsis /></div>
-            <ul tabIndex={-1} className="dropdown-content menu bg-base-200 rounded-box z-1 w-56 p-2 shadow-sm">
-                {name_input_ref && name_input_ref.current && (
-                    <li>
-                        <a onClick={() => name_input_ref.current!.focus()}>
-                            <Pencil className="w-4" /> Rename
+        <>
+            <div className="dropdown">
+                <div tabIndex={0} role="button" className="btn btn-ghost btn-square" title="Page options"><Ellipsis /></div>
+                <ul tabIndex={-1} className="dropdown-content menu bg-base-200 rounded-box z-1 w-56 p-2 shadow-sm">
+                    {name_input_ref && name_input_ref.current && (
+                        <li>
+                            <a onClick={() => name_input_ref.current!.focus()}>
+                                <Pencil className="w-4" /> Rename
+                            </a>
+                        </li>
+                    )}
+                    <li className={is_home ? "menu-disabled" : ""}>
+                        <a onClick={() => { set_home_page(selected); close_dropdown(); }}>
+                            <House className="w-4" /> {is_home ? "This is the home page" : "Set as home"}
                         </a>
                     </li>
-                )}
-                <li className={is_home ? "menu-disabled" : ""}>
-                    <a onClick={() => { set_home_page(selected); close_dropdown(); }}>
-                        <House className="w-4" /> {is_home ? "This is the home page" : "Set as home"}
-                    </a>
-                </li>
-                <li>
-                    <a onClick={() => duplicate_page(selected).then(on_page_click)}>
-                        <Copy className="w-4" /> Duplicate
-                    </a>
-                </li>
-                {/*<li className={position === 0 ? "menu-disabled" : ""}>*/}
-                {/*    <a onClick={() => move_page(selected, position - 1)}><ArrowUp className="w-4" /> Move earlier</a>*/}
-                {/*</li>*/}
-                {/*<li className={position === manifest.order.length - 1 ? "menu-disabled" : ""}>*/}
-                {/*    <a onClick={() => move_page(selected, position + 1)}><ArrowDown className="w-4" /> Move later</a>*/}
-                {/*</li>*/}
+                    <li>
+                        <a onClick={() => duplicate_page(selected).then(on_page_click)}>
+                            <Copy className="w-4" /> Duplicate
+                        </a>
+                    </li>
+                    {/*<li className={position === 0 ? "menu-disabled" : ""}>*/}
+                    {/*    <a onClick={() => move_page(selected, position - 1)}><ArrowUp className="w-4" /> Move earlier</a>*/}
+                    {/*</li>*/}
+                    {/*<li className={position === manifest.order.length - 1 ? "menu-disabled" : ""}>*/}
+                    {/*    <a onClick={() => move_page(selected, position + 1)}><ArrowDown className="w-4" /> Move later</a>*/}
+                    {/*</li>*/}
 
-                <div className="divider m-0" />
+                    <li>
+                        <a onClick={() => setShowConfig(true)}>
+                            <Settings className="w-4" /> Configure page
+                        </a>
+                    </li>
 
-                <li className={is_home ? "menu-disabled" : ""}>
-                    <a className={is_home ? "" : "text-error"} onClick={() => { close_dropdown(); on_delete(); }}>
-                        <Trash className="w-4" /> Delete page
-                    </a>
-                    {is_home && <span className="text-xs opacity-60 pointer-events-none">Make another page home first</span>}
-                </li>
-            </ul>
-        </div>
+                    <div className="divider m-0" />
+
+                    <li className={is_home ? "menu-disabled" : ""}>
+                        <a className={is_home ? "" : "text-error"} onClick={() => { close_dropdown(); on_delete(); }}>
+                            <Trash className="w-4" /> Delete page
+                        </a>
+                        {is_home && <span className="text-xs opacity-60 pointer-events-none">Make another page home first</span>}
+                    </li>
+                </ul>
+            </div>
+
+            <PageConfigDialog page_id={selected} open={show_config} onClose={() => setShowConfig(false)} />
+        </>
     );
 }
 

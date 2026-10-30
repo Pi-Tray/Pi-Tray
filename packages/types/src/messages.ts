@@ -1,5 +1,7 @@
 // what the server sends over the websocket, shared so the server, client and editor all agree on the shape
 
+import type {PageTitle} from "./index.js";
+
 /**
  * A cell as clients receive it: stored values with any live plugin values applied, and the background resolved to a url.
  */
@@ -79,7 +81,7 @@ export type ServerMessage =
     | {action: "paired", payload: PairedDeviceInfo}
     | {action: "paired_devices", payload: PairedDeviceInfo[]}
     | {action: "update_cells", payload: CellPayload[]}
-    | {action: "set_page", payload: {name: string, cells: CellPayload[]}}
+    | {action: "set_page", payload: {name: string, title: PageTitle, cells: CellPayload[]}}
     | {action: "size", payload: {rows: number, cols: number}}
     | {action: "push_ok", payload: CellCoordinates}
     | {action: "push_error", payload: CellCoordinates}

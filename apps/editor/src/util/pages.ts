@@ -2,7 +2,7 @@ import {exists, mkdir, readTextFile, remove, rename, watch, writeTextFile} from 
 import {useCallback, useEffect, useState} from "react";
 
 import {DEFAULT_GRID_SHAPE, PAGE_ID_PATTERN} from "@pi-tray/types";
-import type {CellData, GridShape, PageCells, PageManifest, PluginReference} from "@pi-tray/types";
+import type {CellData, GridShape, PageCells, PageData, PageManifest, PageSettings, PluginReference} from "@pi-tray/types";
 
 import {data_dir, in_data_dir} from "./paths";
 
@@ -128,19 +128,28 @@ const read_manifest = async (): Promise<PageManifest | null> => {
     return {home, order, names, shape: is_valid_shape(raw.shape) ? raw.shape : DEFAULT_GRID_SHAPE};
 }
 
+const EMPTY_PAGE: PageData = {row_data: {}};
+
+const settings_of = ({row_data: _row_data, ...settings}: PageData): PageSettings => settings;
+
 /**
- * @returns the page's cells, empty if its file is missing, or null if it can't be parsed, e.g. it's mid-write
+ * @returns the page's cells and settings, empty if its file is missing, or null if it can't be parsed, e.g. it's mid-write
  */
-const read_page = async (page_id: string): Promise<PageCells | null> => {
+const read_page = async (page_id: string): Promise<PageData | null> => {
     const file_path = await page_file_path(page_id);
 
     if (!await exists(file_path)) {
-        return {};
+        return EMPTY_PAGE;
     }
 
     try {
         const parsed = JSON.parse(await readTextFile(file_path));
-        return parsed?.row_data && typeof parsed.row_data === "object" ? parsed.row_data : {};
+
+        if (!parsed || typeof parsed !== "object") {
+            return EMPTY_PAGE;
+        }
+
+        return {...parsed, row_data: parsed.row_data && typeof parsed.row_data === "object" ? parsed.row_data : {}};
     } catch (error) {
         console.warn(`Couldn't read page ${page_id}:`, error);
         return null;
@@ -157,30 +166,42 @@ let manifest: PageManifest = await read_manifest() ?? {
     shape: DEFAULT_GRID_SHAPE
 };
 
-const pages = new Map<string, PageCells>();
+const pages = new Map<string, PageData>();
 for (const page_id of manifest.order) {
-    pages.set(page_id, await read_page(page_id) ?? {});
+    pages.set(page_id, await read_page(page_id) ?? EMPTY_PAGE);
 }
 
 // --- change listeners ---
 
 const manifest_listeners = new Set<(manifest: PageManifest) => void>();
-const page_listeners = new Map<string, Set<(cells: PageCells) => void>>();
+const cell_listeners = new Map<string, Set<(cells: PageCells) => void>>();
+const settings_listeners = new Map<string, Set<(settings: PageSettings) => void>>();
 
 const notify_manifest = () => {
     manifest_listeners.forEach((listener) => listener(manifest));
 }
 
-const notify_page = (page_id: string) => {
-    const cells = pages.get(page_id) ?? {};
-    page_listeners.get(page_id)?.forEach((listener) => listener(cells));
+/**
+ * Tells listeners about whichever of the page's cells and settings differ from before.
+ */
+const notify_page = (page_id: string, old_page: PageData) => {
+    const page = pages.get(page_id) ?? EMPTY_PAGE;
+
+    if (JSON.stringify(page.row_data) !== JSON.stringify(old_page.row_data)) {
+        cell_listeners.get(page_id)?.forEach((listener) => listener(page.row_data));
+    }
+
+    const settings = settings_of(page);
+    if (JSON.stringify(settings) !== JSON.stringify(settings_of(old_page))) {
+        settings_listeners.get(page_id)?.forEach((listener) => listener(settings));
+    }
 }
 
-const subscribe_to_page = (page_id: string, listener: (cells: PageCells) => void): (() => void) => {
-    let listeners = page_listeners.get(page_id);
+const subscribe = <Value>(listener_map: Map<string, Set<(value: Value) => void>>, page_id: string, listener: (value: Value) => void): (() => void) => {
+    let listeners = listener_map.get(page_id);
     if (!listeners) {
         listeners = new Set();
-        page_listeners.set(page_id, listeners);
+        listener_map.set(page_id, listeners);
     }
 
     listeners.add(listener);
@@ -206,10 +227,12 @@ const save_manifest = async (new_manifest: PageManifest) => {
     notify_manifest();
 }
 
-const save_page = async (page_id: string, cells: PageCells) => {
-    await write_json_atomic(await page_file_path(page_id), {row_data: cells});
-    pages.set(page_id, cells);
-    notify_page(page_id);
+const save_page = async (page_id: string, page: PageData) => {
+    await write_json_atomic(await page_file_path(page_id), page);
+
+    const old_page = pages.get(page_id) ?? EMPTY_PAGE;
+    pages.set(page_id, page);
+    notify_page(page_id, old_page);
 }
 
 /**
@@ -239,7 +262,7 @@ export const create_page = (name = NEW_PAGE_NAME): Promise<string> => queue_writ
     const page_id = crypto.randomUUID();
 
     // the file first, so the server never sees a page in the manifest without its file
-    await save_page(page_id, {});
+    await save_page(page_id, EMPTY_PAGE);
     await save_manifest({...manifest, order: [...manifest.order, page_id], names: {...manifest.names, [page_id]: unique_page_name(name)}});
 
     return page_id;
@@ -254,7 +277,7 @@ export const duplicate_page = (source_id: string): Promise<string> => queue_writ
     const order = [...manifest.order];
     order.splice(order.indexOf(source_id) + 1, 0, page_id);
 
-    await save_page(page_id, structuredClone(pages.get(source_id) ?? {}));
+    await save_page(page_id, structuredClone(pages.get(source_id) ?? EMPTY_PAGE));
     await save_manifest({...manifest, order, names: {...manifest.names, [page_id]: unique_page_name(`${manifest.names[source_id] ?? UNNAMED_PAGE_NAME} copy`)}});
 
     return page_id;
@@ -317,23 +340,38 @@ export const set_grid_shape = (shape: GridShape): Promise<void> => queue_write(a
     }
 });
 
+/**
+ * Changes some of a page's settings, leaving the rest as they are.
+ */
+export const set_page_settings = (page_id: string, changes: Partial<PageSettings>): Promise<void> => queue_write(async () => {
+    const page = pages.get(page_id);
+
+    if (page) {
+        await save_page(page_id, {...page, ...changes});
+    }
+});
+
 export const set_grid_cell = (page_id: string, row_idx: number, col_idx: number, cell_data: CellData): Promise<void> => queue_write(async () => {
-    if (!pages.has(page_id)) {
+    const page = pages.get(page_id);
+
+    if (!page) {
         return;
     }
 
-    const cells = structuredClone(pages.get(page_id) ?? {});
+    const cells = structuredClone(page.row_data);
     (cells[row_idx] ??= {})[col_idx] = cell_data;
 
-    await save_page(page_id, cells);
+    await save_page(page_id, {...page, row_data: cells});
 });
 
 export const delete_grid_cell = (page_id: string, row_idx: number, col_idx: number): Promise<void> => queue_write(async () => {
-    const cells = structuredClone(pages.get(page_id) ?? {});
+    const page = pages.get(page_id);
 
-    if (!cells[row_idx]?.[col_idx]) {
+    if (!page?.row_data[row_idx]?.[col_idx]) {
         return;
     }
+
+    const cells = structuredClone(page.row_data);
 
     delete cells[row_idx][col_idx];
 
@@ -342,7 +380,7 @@ export const delete_grid_cell = (page_id: string, row_idx: number, col_idx: numb
         delete cells[row_idx];
     }
 
-    await save_page(page_id, cells);
+    await save_page(page_id, {...page, row_data: cells});
 });
 
 // --- hooks ---
@@ -378,12 +416,12 @@ export const useGridShape = (): [GridShape, (shape: GridShape) => Promise<void>]
  * @returns undefined for an empty cell
  */
 export const useGridCell = (page_id: string, row_idx: number, col_idx: number): [CellData | undefined, (cell_data: CellData) => Promise<void>] => {
-    const [value, setValue] = useState<CellData | undefined>(() => pages.get(page_id)?.[row_idx]?.[col_idx]);
+    const [value, setValue] = useState<CellData | undefined>(() => pages.get(page_id)?.row_data[row_idx]?.[col_idx]);
 
     useEffect(() => {
-        setValue(pages.get(page_id)?.[row_idx]?.[col_idx]);
+        setValue(pages.get(page_id)?.row_data[row_idx]?.[col_idx]);
 
-        return subscribe_to_page(page_id, (cells) => {
+        return subscribe(cell_listeners, page_id, (cells) => {
             const new_cell = cells[row_idx]?.[col_idx];
 
             // deep comparison, so a write to another cell doesn't re-render this one
@@ -399,6 +437,26 @@ export const useGridCell = (page_id: string, row_idx: number, col_idx: number): 
     return [value, set_cell];
 }
 
+/**
+ * A page's settings, and a setter that changes only the ones given.
+ * @returns empty settings if there's no such page
+ */
+export const usePageSettings = (page_id: string): [PageSettings, (changes: Partial<PageSettings>) => Promise<void>] => {
+    const [value, setValue] = useState<PageSettings>(() => settings_of(pages.get(page_id) ?? EMPTY_PAGE));
+
+    useEffect(() => {
+        setValue(settings_of(pages.get(page_id) ?? EMPTY_PAGE));
+        return subscribe(settings_listeners, page_id, setValue);
+    }, [page_id]);
+
+    const update_settings = useCallback(
+        (changes: Partial<PageSettings>) => set_page_settings(page_id, changes),
+        [page_id]
+    );
+
+    return [value, update_settings];
+}
+
 // --- outside changes, e.g. pages.json edited by hand ---
 
 const reload_manifest = async () => {
@@ -411,7 +469,7 @@ const reload_manifest = async () => {
 
     for (const page_id of new_manifest.order) {
         if (!pages.has(page_id)) {
-            pages.set(page_id, await read_page(page_id) ?? {});
+            pages.set(page_id, await read_page(page_id) ?? EMPTY_PAGE);
         }
     }
 
@@ -430,14 +488,15 @@ const reload_page = async (page_id: string) => {
         return;
     }
 
-    const new_cells = await read_page(page_id);
+    const new_page = await read_page(page_id);
+    const old_page = pages.get(page_id) ?? EMPTY_PAGE;
 
-    if (!new_cells || JSON.stringify(new_cells) === JSON.stringify(pages.get(page_id))) {
+    if (!new_page) {
         return;
     }
 
-    pages.set(page_id, new_cells);
-    notify_page(page_id);
+    pages.set(page_id, new_page);
+    notify_page(page_id, old_page);
 }
 
 // our own writes come back here too, and are skipped as nothing changed

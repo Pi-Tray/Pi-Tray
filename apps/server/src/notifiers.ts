@@ -1,7 +1,7 @@
 import type {Client} from "./clients";
 
 import type {CellPayload, ServerMessage} from "./types";
-import {add_pages_change_listener, get_page, get_page_name, get_shape, home_page_for, home_page_id, PagesChangeListener} from "./pages";
+import {add_pages_change_listener, get_page, get_page_name, get_page_settings, get_shape, home_page_for, home_page_id, PagesChangeListener} from "./pages";
 import {add_asset_change_listener} from "./assets";
 import {build_cell_payload, build_grid_payload} from "./cell_payload";
 import {add_live_state_listener} from "./live/state";
@@ -99,7 +99,11 @@ export const register_notifiers = (client: Client): (() => void) => {
             last_sent.set(cell_key(payload.y, payload.x), JSON.stringify(payload));
         }
 
-        send_message(client, {action: "set_page", payload: {name: get_page_name(client.current_page) ?? "", cells: payloads}});
+        send_message(client, {action: "set_page", payload: {
+            name: get_page_name(client.current_page) ?? "",
+            title: get_page_settings(client.current_page)?.title ?? "right",
+            cells: payloads
+        }});
     }
 
     const pages_changed: PagesChangeListener = (changes) => {
@@ -122,7 +126,8 @@ export const register_notifiers = (client: Client): (() => void) => {
                     }
                     break;
                 case "page_renamed":
-                    // the name only comes with set_page
+                case "page_settings_changed":
+                    // the name and settings only come with set_page
                     if (change.page === client.current_page) {
                         notifier_send_page();
                     }

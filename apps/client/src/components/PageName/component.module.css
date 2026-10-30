@@ -5,10 +5,22 @@
 
     position: absolute;
     top: 0.5em;
-    right: 0.75em;
 
     max-width: 40vw;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.left {
+    left: 0.75em;
+}
+
+.center {
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.right {
+    right: 0.75em;
 }
